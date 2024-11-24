@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 // 定义 AST 节点
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum ASTNode {
     Program(Vec<ASTNode>),
     Assignment{
@@ -73,7 +74,7 @@ impl Parser {
         }
     }
 
-    fn parse_program(&mut self) -> Result<ASTNode, String>{
+    pub fn parse_program(&mut self) -> Result<ASTNode, String>{
         let mut statements:Vec<ASTNode> = Vec::new();
         while self.peek().unwrap().token_type != TokenType::EOF{
             statements.push(self.parse_statement()?);
@@ -203,9 +204,9 @@ fn handle_identifier(ident: &str) -> Result<String, String>{
 fn handle_type(ty: &str) -> Result<String, String>{
     let keywords = ["i32"];
     if keywords.contains(&ty){
-        Err(format!("{ty} is not a valid type."))
-    }else{
         Ok(ty.to_string())
+    }else{  
+        Err(format!("{ty} is not a valid type."))
     }
 
 }
@@ -296,8 +297,15 @@ mod tests{
         let mut parser = Parser::new(tokens.clone());
         assert!(parser.expect(TokenType::KEYWORD, String::from("i32")).is_ok());
         assert!(parser.expect(TokenType::KEYWORD,String::from("sub")).is_ok());
+    }
 
-        
+    #[test]
+    fn handle_type(){
+
+    }
+
+    #[test]
+    fn handle_identifier(){
 
     }
 }

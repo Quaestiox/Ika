@@ -3,4 +3,10 @@ name = "ika"
 version = "0.1.0"
 edition = "2021"
 
+[build]
+target-dir = "target" 
+
+
 [dependencies]
+
+
