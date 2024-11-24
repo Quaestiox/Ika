@@ -149,28 +149,57 @@ impl Parser {
         })
     }
 
-    fn parse_expression(&mut self) -> Result<ASTNode, String>{
-        let left_expr = if self.peek().unwrap().token_type == TokenType::NUMBER {
-            ASTNode::Number(self.advance().unwrap().value.clone())
-        } else if self.peek().unwrap().token_type == TokenType::ID {
-            ASTNode::Identifier(self.advance().unwrap().value.clone())
-        }else {
-            return Err(format!("Unexpected token: {:?}", self.peek()))
-        };
+    fn parse_expression_primary(&mut self) -> Result<ASTNode, String>{
+        let token = self.advance().unwrap();
+        match token.token_type {
+            TokenType::NUMBER => Ok(ASTNode::Number(token.value.clone())),
+            TokenType::ID => Ok(ASTNode::Identifier(token.value.clone())),
+            TokenType::LPAREN => {
+                let expr = self.parse_expression()?;
+                self.expect(TokenType::RPAREN, String::from(")"))?;
+                Ok(expr)
+            },
+            _ => Err(format!("Unexpected token: {:?}", token)),
+        }
+    }
 
-       
-        if ["+","-","*","/"].contains(&self.peek().unwrap().value.as_str()){
-            let op = self.advance().unwrap().value.clone();
-            let right_expr = self.parse_expression()?;
-            return Ok(ASTNode::InfixExpression { 
-                left_expr:Box::new(left_expr),
-                op, 
-                right_expr:Box::new(right_expr),
-            });
+    fn parse_expression_secondary(&mut self) -> Result<ASTNode, String>{
+        let mut primary = self.parse_expression_primary()?;
+
+        while let Ok(token) = self.peek(){
+            if token.token_type == TokenType::ASTERISK || token.token_type == TokenType::SLASH{
+                let op = self.advance().unwrap().value.clone();
+                let right_expr = self.parse_expression_primary()?;
+                primary = ASTNode::InfixExpression {
+                    left_expr:Box::new(primary),
+                    op,
+                    right_expr:Box::new(right_expr),
+                }
+            } else{
+                break;
+            }
+        }
+        Ok(primary)
+    }
+
+    fn parse_expression(&mut self) -> Result<ASTNode, String>{
+        let mut node = self.parse_expression_secondary()?;
+
+        while let Ok(token) = self.peek() {
+            if token.token_type == TokenType::ADD || token.token_type == TokenType::MINUS{
+                let op = self.advance().unwrap().value.clone();
+                let right_expr = self.parse_expression_secondary()?;
+                node = ASTNode::InfixExpression {
+                    left_expr:Box::new(node),
+                    op,
+                    right_expr:Box::new(right_expr),
+                }
+            } else{
+                break;
+            }
         }
 
-        Ok(left_expr)
-
+        Ok(node)
     }
 
     fn parse_block(&mut self) -> Result<Vec<ASTNode>, String>{
@@ -338,6 +367,68 @@ mod tests{
       
         
     }
-   
+
+
+    #[test]
+    fn cal_expr() {
+  
+        let input ="i32 a = 1 * 2 + (3 - 4) / 5;";
+       
     
+        let mut lexer = LEXER::new(input);
+        let mut tokens = Vec::new();
+    
+        
+    
+    
+        tokens = tokenization(&mut lexer).unwrap();
+        tokens.push(Token {
+            token_type: TokenType::EOF,
+            value: String::new(), 
+        });
+        
+    
+        let mut parser = Parser::new(tokens.clone());
+
+        if let ASTNode::Program(statements) = parser.parse_program().unwrap() {
+            assert_eq!(statements.len(), 1); 
+
+            if let ASTNode::Assignment { var_type, identifier, var_value } = &statements[0] {
+                assert_eq!(var_type, "i32");
+                assert_eq!(identifier, "a");
+
+                if let Some(value) = var_value {
+                    if let ASTNode::InfixExpression { left_expr, op, right_expr } = &**value {
+                      
+                        assert!(matches!(**left_expr, ASTNode::InfixExpression { .. }));
+                        if let ASTNode::InfixExpression { left_expr, op, right_expr } = &**left_expr {
+                     
+                            assert!(matches!(**left_expr, ASTNode::Number(ref n) if n == "1"));
+                            assert_eq!(op, "*");
+                            assert!(matches!(**right_expr, ASTNode::Number(ref n) if n == "2"));
+                        }
+
+                        assert_eq!(op, "+");
+                        if let ASTNode::InfixExpression { left_expr, op, right_expr } = &**right_expr {
+                            assert!(matches!(**left_expr, ASTNode::InfixExpression { .. }));
+                            if let ASTNode::InfixExpression { left_expr, op, right_expr } = &**left_expr {    
+                                assert!(matches!(**left_expr, ASTNode::Number(ref n) if n == "3"));
+                                assert_eq!(op, "-");
+                                assert!(matches!(**right_expr, ASTNode::Number(ref n) if n == "4"));
+                            }
+                            assert_eq!(op, "/");
+                            assert!(matches!(**right_expr, ASTNode::Number(ref n) if n == "5"));
+                        }
+                    }
+                } else {
+                    panic!("Expected a value in assignment, but found None");
+                }
+            } else {
+                panic!("Expected an assignment statement");
+            }
+        } else {
+            panic!("Expected program node");
+        }
+    }
+
 }
