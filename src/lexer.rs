@@ -21,6 +21,8 @@ pub enum TokenType{
     QUOTES,
     DQUOTES,
     SLASH,
+    COMMA,
+    ARROW,
     EOF,
 }
 
@@ -136,6 +138,18 @@ impl<'a> LEXER<'a>{
         }
     }
 
+    fn collect_minus(&mut self) -> Token{
+        let c = self.src.peek().unwrap();
+        if *c == '>'{
+            Token{
+                token_type: TokenType::ARROW,
+                value:String::from("->"),
+            }
+        }else{
+            Token{token_type: TokenType::MINUS, value:String::from("-")}
+        }
+        
+    }
  
 
     
@@ -152,8 +166,9 @@ impl<'a> LEXER<'a>{
             Some('\'') => Token{token_type: TokenType::QUOTES, value:String::from("'")},
             Some('"') => Token { token_type: TokenType::DQUOTES, value: String::from("\"")},
             Some('+') => Token{token_type: TokenType::ADD, value:String::from("+")},
-            Some('-') => Token{token_type: TokenType::MINUS, value:String::from("-")},
+            Some('-') => self.collect_minus(),
             Some('*') => Token{token_type: TokenType::ASTERISK, value:String::from("*")},
+            Some(',') => Token{token_type: TokenType::COMMA, value:String::from(",")},
             _ => Token{token_type:TokenType::EOF, value: String::from("")}
 
         }
