@@ -2,7 +2,6 @@ use crate::lexer::{Token,TokenType, Error};
 use std::collections::HashMap;
 
 
-// 定义 AST 节点
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum ASTNode {
@@ -33,9 +32,6 @@ pub enum ASTNode {
     Identifier(String),
 }
 
-
-
-// 定义解析器结构体
 #[derive(Debug)]
 pub struct Parser {
     tokens: Vec<Token>,
@@ -83,7 +79,6 @@ impl Parser {
 
     }
 
-    
     fn parse_statement(&mut self) -> Result<ASTNode, String>{
         let token = self.peek().unwrap();
         match token.token_type{
@@ -99,7 +94,6 @@ impl Parser {
 
         }
     }
-
 
     fn parse_function_definition(&mut self) -> Result<ASTNode, String>{
         self.expect(TokenType::KEYWORD, String::from("sub"))?;
