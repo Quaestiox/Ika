@@ -1,8 +1,8 @@
-use crate::lexer::{Token,TokenType, Error};
+use crate::lexer::{Token,TokenType, Error, LEXER, tokenization};
 use std::collections::HashMap;
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone,PartialEq)]
 #[allow(dead_code)]
 pub enum ASTNode {
     Program(Vec<ASTNode>),
@@ -127,6 +127,7 @@ impl Parser {
     fn parse_return(&mut self) -> Result<ASTNode, String>{
         self.expect(TokenType::KEYWORD, String::from("ret"))?;
         let value = self.parse_statement()?;
+        self.expect(TokenType::SEMICOLON, String::from(";"))?;
         Ok(ASTNode::Return(Box::new(value)))
 
     }
@@ -294,12 +295,49 @@ mod tests{
     }
 
     #[test]
-    fn handle_type(){
+    fn functionDef(){
+        let input ="sub main(i32 a, i32 b) -> i32{ ret a + b; }";
+        println!("{input}");
+    
+        let mut lexer = LEXER::new(input);
+        let mut tokens = Vec::new();
 
+        tokens = tokenization(&mut lexer).unwrap();
+   
+        let mut parser = Parser::new(tokens);
+
+        let result = parser.parse_function_definition();
+    
+        assert!(result.is_ok());
+    
+        if let ASTNode::FunctionDefinition { fn_name, parameters, ret_type, body } = result.unwrap() {
+
+            assert_eq!(fn_name, "main");
+    
+            assert_eq!(parameters.len(), 2);
+            assert_eq!(parameters[0], ("i32".to_string(), "a".to_string()));
+            assert_eq!(parameters[1], ("i32".to_string(), "b".to_string()));
+    
+            assert_eq!(ret_type, Some("i32".to_string()));
+    
+            assert_eq!(body.len(), 1);
+            if let ASTNode::Return(expr) = &body[0] {
+                if let ASTNode::InfixExpression { left_expr, op, right_expr } = &**expr {
+                    assert_eq!(**left_expr, ASTNode::Identifier("a".to_string()));
+                    assert_eq!(op, "+");
+                    assert_eq!(**right_expr, ASTNode::Identifier("b".to_string()));
+                } else {
+                    panic!("Expected InfixExpression inside Return.");
+                }
+            } else {
+                panic!("Expected Return statement in function body.");
+            }
+        } else {
+            panic!("Expected FunctionDefinition ASTNode.");
+        }
+      
+        
     }
-
-    #[test]
-    fn handle_identifier(){
-
-    }
+   
+    
 }

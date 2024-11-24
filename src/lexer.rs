@@ -141,6 +141,7 @@ impl<'a> LEXER<'a>{
     fn collect_minus(&mut self) -> Token{
         let c = self.src.peek().unwrap();
         if *c == '>'{
+            self.src.next();
             Token{
                 token_type: TokenType::ARROW,
                 value:String::from("->"),
