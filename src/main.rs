@@ -1,8 +1,17 @@
 mod lexer;
 mod parser;
+mod sema;
 
 use lexer::{LEXER, tokenization,Token,TokenType};
 use parser::{Parser};
+use sema::{SymbolTable};
+use lazy_static::lazy_static;
+use std::sync::{Arc, Mutex};
+
+
+lazy_static!{
+    pub static ref SYMBOL_TABLE: Arc<Mutex<SymbolTable>> = Arc::new(Mutex::new(SymbolTable::new()));
+}
 
 fn main(){
 
