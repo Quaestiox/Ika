@@ -19,7 +19,7 @@ pub enum ASTNode {
     },
     FunctionCall{
         fn_name:String,
-        argument: Vec<(String, String)>,
+        argument: Vec<ASTNode>,
     },
     InfixExpression{
         left_expr: Box<ASTNode>,
@@ -76,7 +76,6 @@ impl Parser {
             statements.push(self.parse_statement()?);
         }
         Ok(ASTNode::Program(statements))
-
     }
 
     fn parse_statement(&mut self) -> Result<ASTNode, String>{
@@ -132,6 +131,24 @@ impl Parser {
 
     }
 
+    fn parse_function_call(&mut self, fn_name:String ) -> Result<ASTNode, String>{
+        self.expect(TokenType::LPAREN, String::from("("))?;
+        let mut args = Vec::new();
+        while self.peek().unwrap().token_type != TokenType::RPAREN{
+            let arg = self.parse_expression()?;
+            args.push(arg);
+
+            if self.peek().unwrap().token_type == TokenType::COMMA{
+                self.advance();
+            }
+        }
+
+        self.expect(TokenType::RPAREN, String::from(")"))?;
+        self.expect(TokenType::SEMICOLON, String::from(";"))?;
+
+        Ok(ASTNode::FunctionCall { fn_name: fn_name, argument: args })
+    }
+
     fn parse_assignment(&mut self) -> Result<ASTNode, String>{
         let var_type = handle_type(self.advance().unwrap().value.as_str())?;
         let identifier = handle_identifier(self.advance().unwrap().value.as_str())?;
@@ -150,10 +167,17 @@ impl Parser {
     }
 
     fn parse_expression_primary(&mut self) -> Result<ASTNode, String>{
-        let token = self.advance().unwrap();
+        let token = self.advance().unwrap().clone();
         match token.token_type {
             TokenType::NUMBER => Ok(ASTNode::Number(token.value.clone())),
-            TokenType::ID => Ok(ASTNode::Identifier(token.value.clone())),
+            TokenType::ID => {
+                
+                if self.peek().unwrap().token_type == TokenType::LPAREN{
+                    self.parse_function_call(token.value)
+                } else {
+                    Ok(ASTNode::Identifier(token.value.clone()))
+                }
+            }
             TokenType::LPAREN => {
                 let expr = self.parse_expression()?;
                 self.expect(TokenType::RPAREN, String::from(")"))?;
@@ -210,7 +234,6 @@ impl Parser {
         }
         self.expect(TokenType::RBRACE, String::from("}"));
         Ok(statements)
-
     }
 }
 

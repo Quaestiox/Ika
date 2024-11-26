@@ -6,7 +6,7 @@ use parser::{Parser};
 
 fn main(){
 
-    let input ="i32 a = 1 * 2 + (3 - 4) / 5;";
+    let input ="i32 a = 1 * 2 + (3 - 4) / 5;\n add(1+5, b);";
     println!("{input}");
 
     let mut lexer = LEXER::new(input);
