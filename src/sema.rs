@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-
+use lazy_static::lazy_static;
+use std::sync::{Arc, Mutex};
 pub struct SymbolTable{
     variables: HashMap<String, String>,
     functions: HashMap<String, Function>,
@@ -47,11 +48,41 @@ impl SymbolTable {
             true
         }
     }
-
-
-
-
 }
+
+pub struct ScopeManager{
+    stack: Vec<SymbolTable>
+}
+
+impl ScopeManager{
+    fn new() -> Self{
+        let mut sm = Self { stack: Vec::new() };
+        sm.push_scope();
+        sm
+    }
+
+   
+    pub fn push_scope(&mut self) {
+        self.stack.push(SymbolTable::new());
+    }
+
+    pub fn pop_scope(&mut self) {
+        self.stack.pop();
+    }
+
+    pub fn current_scope_mut(&mut self) -> &mut SymbolTable {
+        self.stack.last_mut().unwrap()
+    }
+
+    pub fn current_scope(&self) -> &SymbolTable {
+        self.stack.last().unwrap()
+    }
+}
+
+lazy_static!{
+    pub static ref SYMBOL_TABLES: Arc<Mutex<ScopeManager>> = Arc::new(Mutex::new(ScopeManager::new()));
+}
+
 
 
 #[cfg(test)]

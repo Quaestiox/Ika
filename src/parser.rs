@@ -1,7 +1,6 @@
 use crate::lexer::{Token,TokenType, Error, LEXER, tokenization};
 use std::collections::HashMap;
-use crate::SYMBOL_TABLE;
-use crate::sema::Function;
+use crate::sema::{SYMBOL_TABLES,Function};
 
 #[derive(Debug, Clone,PartialEq)]
 #[allow(dead_code)]
@@ -115,9 +114,9 @@ impl Parser {
     fn parse_function_definition(&mut self) -> Result<ASTNode, String>{
         self.expect(TokenType::KEYWORD, String::from("sub"))?;
         let fn_name = handle_identifier(self.advance().unwrap().value.as_str())?;
-        if SYMBOL_TABLE.lock().unwrap().has_function(fn_name.as_str()) {
+        if SYMBOL_TABLES.lock().unwrap().current_scope().has_function(fn_name.as_str()) {
             return Err(format!("Function '{}' is already defined", fn_name));
-        } 
+        }
         self.expect(TokenType::LPAREN, String::from("("))?;
         let mut parameters = Vec::new();
         while self.peek().unwrap().token_type != TokenType::RPAREN{  
@@ -137,8 +136,13 @@ impl Parser {
         };
 
         let func = Function { fn_name: fn_name.clone(), paras: parameters.clone(), ret_type:ret_type.clone() };
-        SYMBOL_TABLE.lock().unwrap().add_function(fn_name.clone(), func);
+        SYMBOL_TABLES.lock().unwrap().current_scope_mut().add_function(fn_name.clone(), func);
+        SYMBOL_TABLES.lock().unwrap().push_scope();
+        for i in &parameters{
+            SYMBOL_TABLES.lock().unwrap().current_scope_mut().add_variable(i.1.clone(),i.0.clone());
+        }
         let body = self.parse_block()?;
+        SYMBOL_TABLES.lock().unwrap().pop_scope();
         Ok(ASTNode::FunctionDefinition { 
             fn_name, 
             parameters, 
@@ -177,7 +181,7 @@ impl Parser {
     fn parse_variable_definition(&mut self) -> Result<ASTNode, String>{
         let var_type = handle_type(self.advance().unwrap().value.as_str())?;
         let identifier = handle_identifier(self.advance().unwrap().value.as_str())?;
-        if SYMBOL_TABLE.lock().unwrap().has_variable(identifier.as_str()) {
+        if SYMBOL_TABLES.lock().unwrap().current_scope().has_variable(identifier.as_str()) {
             return Err(format!("Variable '{}' is already defined", identifier));
         } 
         let var_value = if self.peek().unwrap().token_type == TokenType::EQUALS{
@@ -187,7 +191,7 @@ impl Parser {
             None
         };
         self.expect(TokenType::SEMICOLON, String::from(";"))?;
-        SYMBOL_TABLE.lock().unwrap().add_variable(identifier.clone(), var_type.clone());
+        SYMBOL_TABLES.lock().unwrap().current_scope_mut().add_variable(identifier.clone(), var_type.clone());
         Ok(ASTNode::VariableDefinition{ 
             var_type, 
             identifier, 
@@ -196,7 +200,7 @@ impl Parser {
     }
 
     fn parse_assignment(&mut self, var_name:String) ->Result<ASTNode, String>{
-        if !SYMBOL_TABLE.lock().unwrap().has_variable(var_name.as_str()){
+        if !SYMBOL_TABLES.lock().unwrap().current_scope().has_variable(var_name.as_str()){
             return Err(format!("No variable {var_name}"));
         }
         self.expect(TokenType::EQUALS, String::from("="))?;
@@ -215,12 +219,12 @@ impl Parser {
             TokenType::ID => {
                 
                 if self.peek().unwrap().token_type == TokenType::LPAREN{
-                    if !SYMBOL_TABLE.lock().unwrap().has_function(token.value.as_str()) {
+                    if !SYMBOL_TABLES.lock().unwrap().current_scope().has_function(token.value.as_str()) {
                         return Err(format!("No Function: '{}' ", token.value));
                     } 
                     self.parse_function_call(token.value)
                 } else {
-                    if !SYMBOL_TABLE.lock().unwrap().has_variable(&token.value){
+                    if !SYMBOL_TABLES.lock().unwrap().current_scope().has_variable(&token.value){
                         return Err(format!("No such variable {}", &token.value));
                     }
                     Ok(ASTNode::Identifier(token.value.clone()))
@@ -504,7 +508,7 @@ mod tests{
 
     #[test]
     fn err_already_have_value(){
-        SYMBOL_TABLE.lock().unwrap().add_variable("test_a".to_string(), "i32".to_string());
+        SYMBOL_TABLES.lock().unwrap().current_scope_mut().add_variable("test_a".to_string(), "i32".to_string());
         let input = "a = 5;";
         let mut lexer = LEXER::new(input);
         let mut tokens = Vec::new(); 
