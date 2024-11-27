@@ -1,6 +1,7 @@
 mod lexer;
 mod parser;
 mod sema;
+mod io;
 
 use lexer::{LEXER, tokenization,Token,TokenType};
 use parser::{Parser};
@@ -15,7 +16,10 @@ lazy_static!{
 
 fn main(){
 
-    let input ="i32 a = 1 * 2 + (3 - 4) / 5;\n add(1+5, b);";
+    let path = std::env::args();
+    println!("{:?}", path);
+
+    let input ="i32 a = 1 * 2 + (3 - 4) / 5;\na = 5;";
     println!("{input}");
 
     let mut lexer = LEXER::new(input);

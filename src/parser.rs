@@ -8,7 +8,6 @@ use crate::sema::Function;
 pub enum ASTNode {
     Program(Vec<ASTNode>),
     Assignment{
-        var_type: String,
         identifier: String,
         var_value: Option<Box<ASTNode>>,
     },
@@ -17,6 +16,11 @@ pub enum ASTNode {
         parameters:Vec<(String, String)>,
         ret_type: Option<String>,
         body: Vec<ASTNode>
+    },
+    VariableDefinition{
+        var_type: String,
+        identifier: String,
+        var_value: Option<Box<ASTNode>>,
     },
     FunctionCall{
         fn_name:String,
@@ -86,8 +90,21 @@ impl Parser {
                 match token.value.as_str() {
                     "sub" => self.parse_function_definition(),
                     "ret" => self.parse_return(),
-                    "i32" => self.parse_assignment(),
+                    "i32" => self.parse_variable_definition(),
                     _ => Err(format!("parse_statement error"))
+                }
+            }
+            TokenType::ID => {
+                let token = self.advance().unwrap().clone();
+                let cur = self.peek().unwrap();
+                match cur.token_type{
+                    TokenType::EQUALS => {
+                        self.parse_assignment(token.value.clone())
+                    }
+                    TokenType::LPAREN =>{
+                        self.parse_function_call(token.value.clone())
+                    }
+                    _ => Err(format!("Invalid symbol {:?}",cur))
                 }
             }
             _ => self.parse_expression()
@@ -98,7 +115,7 @@ impl Parser {
     fn parse_function_definition(&mut self) -> Result<ASTNode, String>{
         self.expect(TokenType::KEYWORD, String::from("sub"))?;
         let fn_name = handle_identifier(self.advance().unwrap().value.as_str())?;
-        if SYMBOL_TABLE.lock().unwrap().has_value(fn_name.as_str()) {
+        if SYMBOL_TABLE.lock().unwrap().has_function(fn_name.as_str()) {
             return Err(format!("Function '{}' is already defined", fn_name));
         } 
         self.expect(TokenType::LPAREN, String::from("("))?;
@@ -156,11 +173,11 @@ impl Parser {
         Ok(ASTNode::FunctionCall { fn_name: fn_name, argument: args })
     }
 
-    fn parse_assignment(&mut self) -> Result<ASTNode, String>{
+    fn parse_variable_definition(&mut self) -> Result<ASTNode, String>{
         let var_type = handle_type(self.advance().unwrap().value.as_str())?;
         let identifier = handle_identifier(self.advance().unwrap().value.as_str())?;
-        if SYMBOL_TABLE.lock().unwrap().has_value(identifier.as_str()) {
-            return Err(format!("Function '{}' is already defined", identifier));
+        if SYMBOL_TABLE.lock().unwrap().has_variable(identifier.as_str()) {
+            return Err(format!("Variable '{}' is already defined", identifier));
         } 
         let var_value = if self.peek().unwrap().token_type == TokenType::EQUALS{
             self.advance();
@@ -170,9 +187,22 @@ impl Parser {
         };
         self.expect(TokenType::SEMICOLON, String::from(";"))?;
         SYMBOL_TABLE.lock().unwrap().add_variable(identifier.clone(), var_type.clone());
-        Ok(ASTNode::Assignment { 
+        Ok(ASTNode::VariableDefinition{ 
             var_type, 
             identifier, 
+            var_value,
+        })
+    }
+
+    fn parse_assignment(&mut self, var_name:String) ->Result<ASTNode, String>{
+        if !SYMBOL_TABLE.lock().unwrap().has_variable(var_name.as_str()){
+            return Err(format!("No variable {var_name}"));
+        }
+        self.expect(TokenType::EQUALS, String::from("="))?;
+        let var_value = Some(Box::new(self.parse_expression()?));
+        self.expect(TokenType::SEMICOLON, String::from(";"))?;
+        Ok(ASTNode::Assignment {    
+            identifier: var_name, 
             var_value,
         })
     }
@@ -184,7 +214,7 @@ impl Parser {
             TokenType::ID => {
                 
                 if self.peek().unwrap().token_type == TokenType::LPAREN{
-                    if SYMBOL_TABLE.lock().unwrap().has_value(token.value.as_str()) {
+                    if !SYMBOL_TABLE.lock().unwrap().has_function(token.value.as_str()) {
                         return Err(format!("No Function: '{}' ", token.value));
                     } 
                     self.parse_function_call(token.value)
@@ -430,7 +460,7 @@ mod tests{
         if let ASTNode::Program(statements) = parser.parse_program().unwrap() {
             assert_eq!(statements.len(), 1); 
 
-            if let ASTNode::Assignment { var_type, identifier, var_value } = &statements[0] {
+            if let ASTNode::VariableDefinition { var_type, identifier, var_value } = &statements[0] {
                 assert_eq!(var_type, "i32");
                 assert_eq!(identifier, "a");
 
@@ -466,6 +496,26 @@ mod tests{
         } else {
             panic!("Expected program node");
         }
+    }
+
+    #[test]
+    fn err_already_have_value(){
+        SYMBOL_TABLE.lock().unwrap().add_variable("test_a".to_string(), "i32".to_string());
+        let input = "a = 5;";
+        let mut lexer = LEXER::new(input);
+        let mut tokens = Vec::new(); 
+        tokens = tokenization(&mut lexer).unwrap();
+        tokens.push(Token {
+            token_type: TokenType::EOF,
+            value: String::new(), 
+        });
+        
+    
+        let mut parser = Parser::new(tokens.clone());
+        assert!(parser.parse_program().is_err());
+       
+
+
     }
 
    

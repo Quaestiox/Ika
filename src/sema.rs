@@ -32,8 +32,16 @@ impl SymbolTable {
         self.functions.get(name)
     }
 
-    pub fn has_value(&self, name:&str) -> bool {
-        if self.variables.get(name).is_none() && self.functions.get(name).is_none(){
+    pub fn has_variable(&self, name:&str) -> bool {
+        if self.variables.get(name).is_none(){
+            false
+        } else{
+            true
+        }
+    }
+
+    pub fn has_function(&self, name:&str) -> bool {
+        if self.functions.get(name).is_none(){
             false
         } else{
             true
@@ -54,8 +62,8 @@ mod tests{
     fn add_has_value(){
         let mut st = SymbolTable::new();
         st.add_variable("a".to_string(), "i32".to_string());
-        let res1 = st.has_value("a");
-        let res2 = st.has_value("b");
+        let res1 = st.has_variable("a");
+        let res2 = st.has_variable("b");
 
         assert_eq!(res1, true);
         assert_eq!(res2, false);
