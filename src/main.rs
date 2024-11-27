@@ -8,7 +8,7 @@ use parser::{Parser};
 use sema::{SymbolTable};
 use lazy_static::lazy_static;
 use std::sync::{Arc, Mutex};
-
+use io::{read_fs};
 
 lazy_static!{
     pub static ref SYMBOL_TABLE: Arc<Mutex<SymbolTable>> = Arc::new(Mutex::new(SymbolTable::new()));
@@ -16,16 +16,16 @@ lazy_static!{
 
 fn main(){
 
-    let path = std::env::args();
-    println!("{:?}", path);
+    let args:Vec<String> = std::env::args().collect();
+    let path = &args[1];
 
-    let input ="i32 a = 1 * 2 + (3 - 4) / 5;\na = 5;";
+    let content = read_fs(path);
+    let input = content.as_str();
+    
     println!("{input}");
 
     let mut lexer = LEXER::new(input);
     let mut tokens = Vec::new();
-
-    
 
 
     tokens = tokenization(&mut lexer).unwrap();

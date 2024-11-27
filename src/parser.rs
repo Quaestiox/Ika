@@ -149,7 +149,7 @@ impl Parser {
 
     fn parse_return(&mut self) -> Result<ASTNode, String>{
         self.expect(TokenType::KEYWORD, String::from("ret"))?;
-        let value = self.parse_statement()?;
+        let value = self.parse_expression()?;
         self.expect(TokenType::SEMICOLON, String::from(";"))?;
         Ok(ASTNode::Return(Box::new(value)))
 
@@ -160,6 +160,7 @@ impl Parser {
         let mut args = Vec::new();
         while self.peek().unwrap().token_type != TokenType::RPAREN{
             let arg = self.parse_expression()?;
+           
             args.push(arg);
 
             if self.peek().unwrap().token_type == TokenType::COMMA{
@@ -219,6 +220,9 @@ impl Parser {
                     } 
                     self.parse_function_call(token.value)
                 } else {
+                    if !SYMBOL_TABLE.lock().unwrap().has_variable(&token.value){
+                        return Err(format!("No such variable {}", &token.value));
+                    }
                     Ok(ASTNode::Identifier(token.value.clone()))
                 }
             }
