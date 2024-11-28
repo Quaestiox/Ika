@@ -1,11 +1,15 @@
 use std::collections::HashMap;
 use lazy_static::lazy_static;
 use std::sync::{Arc, Mutex};
+
+#[derive(Debug)]
 pub struct SymbolTable{
     variables: HashMap<String, String>,
     functions: HashMap<String, Function>,
 }
 
+
+#[derive(Debug)]
 pub struct Function {
     pub fn_name: String,
     pub paras: Vec<(String, String)>,
@@ -50,6 +54,7 @@ impl SymbolTable {
     }
 }
 
+#[derive(Debug)]
 pub struct ScopeManager{
     stack: Vec<SymbolTable>
 }
@@ -77,10 +82,20 @@ impl ScopeManager{
     pub fn current_scope(&self) -> &SymbolTable {
         self.stack.last().unwrap()
     }
+
+    pub fn is_global_scope(&self) -> bool{
+        if self.stack.len() == 1{
+            true
+        } else{
+            false
+        }
+    }
 }
 
 lazy_static!{
+  
     pub static ref SYMBOL_TABLES: Arc<Mutex<ScopeManager>> = Arc::new(Mutex::new(ScopeManager::new()));
+    
 }
 
 

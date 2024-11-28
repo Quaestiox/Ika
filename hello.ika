@@ -1,6 +1,4 @@
-i32 a = 1 + 5 - 7 * 4 / 2;
-a = 1;
-sub add(i32 a, i32 b) -> i32{
-    ret a + b;
+i32 a = 1 ;
+sub main(){
 }
-add(a, a);
+
