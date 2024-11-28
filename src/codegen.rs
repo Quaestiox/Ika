@@ -62,6 +62,8 @@ impl Codegen {
                 body 
             } => self.generate_code_fundef(fn_name, parameters, ret_type, body),
 
+            ASTNode::Return(ast) => self.generate_code_return(*ast),
+            
             _ => ()
         }
     }
@@ -124,15 +126,41 @@ impl Codegen {
             } => {
 
 
-                self.generate_code_expression(*left_expr);
-                let tmp = self.tmp;
+                let left = self.generate_code_expression(*left_expr);
+                
+
+                let right = self.generate_code_expression(*right_expr);
+
+                
+
+                let tmp_left = self.tmp;
                 self.tmp += 1;
-                self.output.push_str(&format!(" "));
+                self.output.push_str(format!("\t%{tmp_left} = load i32, ptr {left}\n").as_str());
+
+                let tmp_right = self.tmp;
+                self.tmp += 1;
+                self.output.push_str(format!("\t%{tmp_right} = load i32, ptr {right}\n").as_str());
+
+                let tmp_res = self.tmp;
+                self.tmp += 1;
+                if op == "+"{
+                    self.output.push_str(format!("\t%{tmp_res} = add i32 %{tmp_left}, %{tmp_right}\n").as_str());
+                } else if op == "-"{
+                    self.output.push_str(format!("\t%{tmp_res} = sub i32 %{tmp_left}, %{tmp_right}\n").as_str());
+                }else if op == "*"{
+                    self.output.push_str(format!("\t%{tmp_res} = mul i32 %{tmp_left}, %{tmp_right}\n").as_str());
+                }else if op == "/"{
+                    self.output.push_str(format!("\t%{tmp_res} = udiv i32 %{tmp_left}, %{tmp_right}\n").as_str());
+                }else{
+
+                }
+
+                
 
                 if self.scope != 1{
-                    format!("%{tmp}")
+                    format!("%{tmp_res}")
                 } else{
-                    format!("@{tmp}")
+                    format!("@{tmp_res}")
                 }
             },
             ASTNode::Number(num) => {
@@ -167,6 +195,8 @@ impl Codegen {
             llvm_ret_type, fn_name
         ));
 
+        let mut gen = String::new();
+
         for (i, para) in parameters.iter().enumerate() {
             let tmp = self.tmp;
             self.tmp += 1;
@@ -175,19 +205,28 @@ impl Codegen {
             if i > 0 {
                 self.output.push_str(", ");
             }
+           
+            
+
+            let ltmp = self.tmp;
+            self.tmp += 1;
+            gen.push_str(format!("\t%{ltmp} = alloca {llvm_para_type}\n").as_str());
+            gen.push_str(format!("\tstore {llvm_para_type} %{para_name}, ptr %{ltmp}\n").as_str());
             self.output.push_str(&format!("{} %{}", llvm_para_type, para_name));
             let varinfo = VarInfo{
-                tmp_name: format!("%{para_name}"),
-                ty: llvm_para_type,
+                tmp_name: format!("%{ltmp}"),
+                ty: llvm_para_type.clone(),
                 scope: 2,
                 
             };
             self.variables.insert(para_name.clone(), varinfo);
         }
         self.output.push_str(") {\n");
-
+        self.output.push_str(&gen);
+        
 
         self.scope += 1;
+        self.tmp+= 1;
         if llvm_ret_type == "void".to_string(){
             for stmt in body {
                 self.generate_statement(stmt);
@@ -203,6 +242,16 @@ impl Codegen {
 
         self.output.push_str("}\n");
         self.scope -= 1;
+    }
+
+    fn generate_code_return(&mut self, ast:ASTNode){
+        let value = self.generate_code_expression(ast);
+        
+        // let ty = var.ty.clone();
+        let tmp = self.tmp;
+        self.tmp += 1;
+        self.output.push_str(&format!("\t%{tmp} = load i32, ptr {value}\n"));
+        self.output.push_str(&format!("\tret i32 {tmp}\n"));
     }
 
     fn generate_code_assignment(&mut self,  identifier: String, var_value: Option<Box<ASTNode>>,){  
