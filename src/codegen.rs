@@ -7,7 +7,14 @@ pub struct Codegen {
     output: String,
     tmp: i64,
     scope: i32,
-    variables: HashMap<String, String>, // 存储当前作用域中的变量
+    variables: HashMap<String, VarInfo>, // 存储当前作用域中的变量
+}
+
+#[derive(Debug, Clone)]
+pub struct VarInfo{
+    tmp_name: String,
+    ty:String,
+    scope: i32,
 }
 
 impl Codegen {
@@ -43,6 +50,11 @@ impl Codegen {
                 var_value 
             } => self.generate_code_vardef(var_type, identifier, var_value),
 
+            ASTNode::Assignment { 
+                identifier, 
+                var_value 
+            } => self.generate_code_assignment(identifier, var_value),
+
             ASTNode::FunctionDefinition { 
                 fn_name, 
                 parameters, 
@@ -62,16 +74,21 @@ impl Codegen {
         if self.scope != 1{
             let tmp = self.tmp;
             self.tmp += 1;
-            self.output.push_str(&format!("%{tmp} = alloca {llvm_var_type}"));
+            self.output.push_str(&format!("\t%{tmp} = alloca {llvm_var_type}\n"));
            
             match var_value{
                 Some(expr) => {
                     let value = self.generate_code_expression(*expr);
-                    self.output.push_str(&format!("store {llvm_var_type} {value}, ptr {tmp}\n"));
+                    self.output.push_str(&format!("\tstore {llvm_var_type} {value}, ptr %{tmp}\n"));
                 }
                 None => ()
             }
-            self.variables.insert(identifier, format!("%{tmp}"));
+            let varinfo = VarInfo{
+                tmp_name: format!("%{tmp}"),
+                ty:llvm_var_type,
+                scope:2,
+            };
+            self.variables.insert(identifier, varinfo);
         } else{
             let tmp = self.tmp;
             self.tmp += 1;
@@ -86,7 +103,12 @@ impl Codegen {
                     self.output.push_str(&format!(" 0\n"));
                 }
             }
-            self.variables.insert(identifier, format!("@{tmp}"));
+            let varinfo = VarInfo{
+                tmp_name: format!("@{tmp}"),
+                ty:llvm_var_type,
+                scope:1,
+            };
+            self.variables.insert(identifier, varinfo);
 
         }
 
@@ -116,18 +138,15 @@ impl Codegen {
             ASTNode::Number(num) => {
                 let tmp = self.tmp;
                 self.tmp += 1;
-                if self.scope != 1{
-                    self.output.push_str(&format!("%{tmp} , alloca i32\n"));
-                    self.output.push_str(&format!("store i32 {num}, ptr %{tmp}\n"));
-                    format!("%{tmp}")
-                } else {
+                
                    
-                    format!("{num}")
-                }
+                   
+                format!("{num}")
+                
               
             },
             ASTNode::Identifier(id) => {
-                self.variables.get(&id).cloned().unwrap_or("".to_string())
+                self.variables.get(&id).cloned().unwrap().tmp_name
             }
 
             _ => "".to_string()
@@ -149,13 +168,21 @@ impl Codegen {
         ));
 
         for (i, para) in parameters.iter().enumerate() {
+            let tmp = self.tmp;
+            self.tmp += 1;
             let llvm_para_type = turn_to_llvm_type(para.0.clone()).unwrap();
             let para_name = &para.1;
             if i > 0 {
                 self.output.push_str(", ");
             }
             self.output.push_str(&format!("{} %{}", llvm_para_type, para_name));
-            self.variables.insert(para_name.clone(), llvm_para_type);
+            let varinfo = VarInfo{
+                tmp_name: format!("%{para_name}"),
+                ty: llvm_para_type,
+                scope: 2,
+                
+            };
+            self.variables.insert(para_name.clone(), varinfo);
         }
         self.output.push_str(") {\n");
 
@@ -178,12 +205,22 @@ impl Codegen {
         self.scope -= 1;
     }
 
+    fn generate_code_assignment(&mut self,  identifier: String, var_value: Option<Box<ASTNode>>,){  
+        let llvm_var_info = self.variables.get(&identifier).cloned().unwrap();
+        let value = self.generate_code_expression(*var_value.unwrap());
+        if llvm_var_info.scope != 1{
+            let ty = llvm_var_info.ty;
+            let var_name = llvm_var_info.tmp_name;
+            self.output.push_str(format!("\tstore {ty} {value}, ptr {var_name}\n").as_str());
+        }else{
+            let ty = llvm_var_info.ty;
+            let var_name = llvm_var_info.tmp_name;
+            self.output.push_str(format!("\tstore {ty} {value}, ptr {var_name}\n").as_str());
+        }
+        
+    }
+
    
-    
-    // fn change_var_to_tmp(var: String) -> Option<String>{
-
-    // }
-
   
 
     
