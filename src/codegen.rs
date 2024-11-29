@@ -180,9 +180,10 @@ impl Codegen {
                 }
             },
             ASTNode::Number(num) => {
-                let tmp = self.tmp;
-                self.tmp += 1;
+                
                 if self.scope != 1{
+                    let tmp = self.tmp;
+                    self.tmp += 1;
                     self.output.push_str(&format!("\t%{tmp} = alloca i32\n"));
                     self.output.push_str(&format!("\tstore i32 {num}, ptr %{tmp}\n"));
                     format!("%{tmp}")
@@ -216,8 +217,7 @@ impl Codegen {
         let mut gen = String::new();
 
         for (i, para) in parameters.iter().enumerate() {
-            let tmp = self.tmp;
-            self.tmp += 1;
+            
             let llvm_para_type = turn_to_llvm_type(para.0.clone()).unwrap();
             let para_name = &para.1;
             if i > 0 {
@@ -244,7 +244,7 @@ impl Codegen {
         
 
         self.scope += 1;
-        self.tmp+= 1;
+       
         if llvm_ret_type == "void".to_string(){
             for stmt in body {
                 self.generate_statement(stmt);
@@ -301,6 +301,7 @@ impl Codegen {
         let fun = self.variables.get(&fn_name).unwrap();
         let ret_type = fun.ty.clone();
         let mut values = Vec::new();
+
         for i in argument{
             let v = self.generate_code_expression(i);
             let ptmp = self.tmp;
@@ -310,19 +311,37 @@ impl Codegen {
 
             
         }
-        let tmp = self.tmp;
-        self.tmp += 1;
-        self.output.push_str(&format!("\t%{tmp} = call {ret_type} @{fn_name}("));
-        for i in &values{
-            if i == values.last().unwrap() {
-                self.output.push_str(&format!("i32 {i}"));
-            }else{
-                self.output.push_str(&format!("i32 {i},"));
-            }
-            
-        }
 
-        let tmp2 = self.tmp;
+        if ret_type == "void".to_string(){
+            self.output.push_str(&format!("\tcall void @{fn_name}("));
+            for i in &values{
+                if i == values.last().unwrap() {
+                    self.output.push_str(&format!("i32 {i}"));
+                }else{
+                    self.output.push_str(&format!("i32 {i},"));
+                }
+                
+            }
+            let tmp2 = self.tmp;
+            self.tmp += 1;
+       
+
+            self.output.push_str(&format!(")\n"));
+            "".to_string()
+
+        }else{
+            let tmp = self.tmp;
+            self.tmp += 1;
+            self.output.push_str(&format!("\t%{tmp} = call {ret_type} @{fn_name}("));
+            for i in &values{
+                if i == values.last().unwrap() {
+                    self.output.push_str(&format!("i32 {i}"));
+                }else{
+                    self.output.push_str(&format!("i32 {i},"));
+                }
+                
+            }
+            let tmp2 = self.tmp;
         self.tmp += 1;
        
 
@@ -330,6 +349,12 @@ impl Codegen {
         self.output.push_str(&format!("\t%{tmp2} = alloca i32 \n"));
         self.output.push_str(&format!("\tstore i32 %{tmp}, ptr %{tmp2} \n"));
         format!("%{tmp2}")
+    
+
+        }
+       
+       
+        
 
     }
   
@@ -341,6 +366,7 @@ impl Codegen {
 fn turn_to_llvm_type(ty: String) -> Result<String, String> {
     match ty.as_str() {
         "i32" => Ok("i32".to_string()),
+        "void" => Ok("void".to_string()),
         _ => Err(format!("Cannot turn type '{}' to LLVM type", ty)),
     }
 }

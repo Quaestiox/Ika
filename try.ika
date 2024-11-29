@@ -4,9 +4,14 @@ sub add(i32 a, i32 b)->i32{
     ret a + b;
 }
 
+sub echo(i32 k)->void{
+
+}
+
 sub main(){
     i32 e = @global;
-    i32 f = 2;
+    i32 f = 2 + e;
     i32 c = add(e, f);
+    echo(c);
 }
 

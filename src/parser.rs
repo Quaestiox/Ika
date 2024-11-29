@@ -101,7 +101,10 @@ impl Parser {
                         self.parse_assignment(token.value.clone())
                     }
                     TokenType::LPAREN =>{
-                        self.parse_function_call(token.value.clone())
+                        
+                        let ast =self.parse_function_call(token.value.clone());
+                        self.expect(TokenType::SEMICOLON, String::from(";"))?;
+                        ast
                     }
                     _ => Err(format!("Invalid symbol {:?}",cur))
                 }
