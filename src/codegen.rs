@@ -7,7 +7,7 @@ pub struct Codegen {
     output: String,
     tmp: i64,
     scope: i32,
-    variables: HashMap<String, VarInfo>, // 存储当前作用域中的变量
+    variables: HashMap<String, VarInfo>, 
 }
 
 #[derive(Debug, Clone)]
@@ -81,7 +81,10 @@ impl Codegen {
             match var_value{
                 Some(expr) => {
                     let value = self.generate_code_expression(*expr);
-                    self.output.push_str(&format!("\tstore {llvm_var_type} {value}, ptr %{tmp}\n"));
+                    let tmp2 = self.tmp;
+                    self.tmp += 1;
+                    self.output.push_str(&format!("\t%{tmp2} = load i32, ptr {value}\n"));
+                    self.output.push_str(&format!("\tstore {llvm_var_type} {tmp2}, ptr %{tmp}\n"));
                 }
                 None => ()
             }
@@ -131,45 +134,66 @@ impl Codegen {
 
                 let right = self.generate_code_expression(*right_expr);
 
-                
-
-                let tmp_left = self.tmp;
-                self.tmp += 1;
-                self.output.push_str(format!("\t%{tmp_left} = load i32, ptr {left}\n").as_str());
-
-                let tmp_right = self.tmp;
-                self.tmp += 1;
-                self.output.push_str(format!("\t%{tmp_right} = load i32, ptr {right}\n").as_str());
-
-                let tmp_res = self.tmp;
-                self.tmp += 1;
-                if op == "+"{
-                    self.output.push_str(format!("\t%{tmp_res} = add i32 %{tmp_left}, %{tmp_right}\n").as_str());
-                } else if op == "-"{
-                    self.output.push_str(format!("\t%{tmp_res} = sub i32 %{tmp_left}, %{tmp_right}\n").as_str());
-                }else if op == "*"{
-                    self.output.push_str(format!("\t%{tmp_res} = mul i32 %{tmp_left}, %{tmp_right}\n").as_str());
-                }else if op == "/"{
-                    self.output.push_str(format!("\t%{tmp_res} = udiv i32 %{tmp_left}, %{tmp_right}\n").as_str());
-                }else{
-
-                }
-
-                
-
                 if self.scope != 1{
-                    format!("%{tmp_res}")
+
+                    let tmp_left = self.tmp;
+                    self.tmp += 1;
+                    self.output.push_str(format!("\t%{tmp_left} = load i32, ptr {left}\n").as_str());
+
+                    let tmp_right = self.tmp;
+                    self.tmp += 1;
+                    self.output.push_str(format!("\t%{tmp_right} = load i32, ptr {right}\n").as_str());
+
+                    let tmp_res = self.tmp;
+                    self.tmp += 1;
+                    if op == "+"{
+                        self.output.push_str(format!("\t%{tmp_res} = add i32 %{tmp_left}, %{tmp_right}\n").as_str());
+                    } else if op == "-"{
+                        self.output.push_str(format!("\t%{tmp_res} = sub i32 %{tmp_left}, %{tmp_right}\n").as_str());
+                    }else if op == "*"{
+                        self.output.push_str(format!("\t%{tmp_res} = mul i32 %{tmp_left}, %{tmp_right}\n").as_str());
+                    }else if op == "/"{
+                        self.output.push_str(format!("\t%{tmp_res} = udiv i32 %{tmp_left}, %{tmp_right}\n").as_str());
+                    }else{
+
+                    }
+
+                    let tmp_new = self.tmp;
+                    self.tmp += 1;
+                    self.output.push_str(format!("\t%{tmp_new} = alloca i32\n").as_str());
+                    self.output.push_str(format!("\tstore i32 %{tmp_res}, ptr %{tmp_new}\n").as_str());
+                    format!("%{tmp_new}")
                 } else{
-                    format!("@{tmp_res}")
+                    let tmp_new = if op == "+"{
+                        turn_string_to_int(left) + turn_string_to_int(right)
+                    } else if op == "-"{
+                        turn_string_to_int(left) - turn_string_to_int(right)
+                    }else if op == "*"{
+                        turn_string_to_int(left) * turn_string_to_int(right)
+                    }else if op == "/"{
+                        turn_string_to_int(left) / turn_string_to_int(right)
+                    }else{
+                        0
+                    };
+                    format!("{tmp_new}")
                 }
             },
             ASTNode::Number(num) => {
                 let tmp = self.tmp;
                 self.tmp += 1;
+                if self.scope != 1{
+                    self.output.push_str(&format!("\t%{tmp} = alloca i32\n"));
+                    self.output.push_str(&format!("\tstore i32 {num}, ptr %{tmp}\n"));
+                    format!("%{tmp}")
+                } else{
+                    format!("{num}")
+
+                }
+               
                 
                    
                    
-                format!("{num}")
+                
                 
               
             },
@@ -246,12 +270,13 @@ impl Codegen {
 
     fn generate_code_return(&mut self, ast:ASTNode){
         let value = self.generate_code_expression(ast);
+     
         
         // let ty = var.ty.clone();
         let tmp = self.tmp;
         self.tmp += 1;
         self.output.push_str(&format!("\t%{tmp} = load i32, ptr {value}\n"));
-        self.output.push_str(&format!("\tret i32 {tmp}\n"));
+        self.output.push_str(&format!("\tret i32 %{tmp}\n"));
     }
 
     fn generate_code_assignment(&mut self,  identifier: String, var_value: Option<Box<ASTNode>>,){  
@@ -281,6 +306,10 @@ fn turn_to_llvm_type(ty: String) -> Result<String, String> {
         "i32" => Ok("i32".to_string()),
         _ => Err(format!("Cannot turn type '{}' to LLVM type", ty)),
     }
+}
+
+fn turn_string_to_int(str: String) -> i32{
+    str.parse::<i32>().unwrap()
 }
 
 

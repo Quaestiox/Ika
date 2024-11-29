@@ -23,6 +23,7 @@ pub enum TokenType{
     SLASH,
     COMMA,
     ARROW,
+    AT,
     EOF,
 }
 
@@ -170,6 +171,7 @@ impl<'a> LEXER<'a>{
             Some('-') => self.collect_minus(),
             Some('*') => Token{token_type: TokenType::ASTERISK, value:String::from("*")},
             Some(',') => Token{token_type: TokenType::COMMA, value:String::from(",")},
+            Some('@') => Token{token_type: TokenType::AT, value:String::from("@")},
             _ => Token{token_type:TokenType::EOF, value: String::from("")}
 
         }

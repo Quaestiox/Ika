@@ -56,7 +56,7 @@ impl SymbolTable {
 
 #[derive(Debug)]
 pub struct ScopeManager{
-    stack: Vec<SymbolTable>
+    pub stack: Vec<SymbolTable>
 }
 
 impl ScopeManager{

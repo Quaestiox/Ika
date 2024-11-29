@@ -230,6 +230,29 @@ impl Parser {
                     Ok(ASTNode::Identifier(token.value.clone()))
                 }
             }
+            TokenType::AT => {
+                
+                if self.peek().unwrap().token_type == TokenType::ID{
+                    let token = self.advance().unwrap().clone();
+                    if self.peek().unwrap().token_type == TokenType::LPAREN{
+                        if !SYMBOL_TABLES.lock().unwrap().stack[0].has_function(token.value.as_str()) {
+                            return Err(format!("No Function: '{}' ", token.value));
+                        } 
+                        self.parse_function_call(token.value)
+                    } else {
+                        if !SYMBOL_TABLES.lock().unwrap().stack[0].has_variable(&token.value){
+                            return Err(format!("No such variable {}", &token.value));
+                        }
+                        Ok(ASTNode::Identifier(token.value.clone()))
+                    }
+
+                }else {
+                    return Err(format!("@ should before the the variable or function."))
+                }
+                 
+               
+
+            }
             TokenType::LPAREN => {
                 let expr = self.parse_expression()?;
                 self.expect(TokenType::RPAREN, String::from(")"))?;

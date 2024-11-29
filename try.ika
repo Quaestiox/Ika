@@ -1,0 +1,10 @@
+sub main(){
+
+}
+
+i32 g = 1 + 2;
+
+sub add(i32 a, i32 b)->i32{
+    i32 f = a + @g;
+    ret f;
+}
