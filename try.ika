@@ -1,10 +1,12 @@
-sub main(){
-
-}
-
-i32 g = 1 + 2;
+i32 global = 1;
 
 sub add(i32 a, i32 b)->i32{
-    i32 f = a + @g;
-    ret f;
+    ret a + b;
 }
+
+sub main(){
+    i32 e = @global;
+    i32 f = 2;
+    i32 c = add(e, f);
+}
+

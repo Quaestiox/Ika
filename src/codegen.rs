@@ -64,6 +64,7 @@ impl Codegen {
 
             ASTNode::Return(ast) => self.generate_code_return(*ast),
             
+            ASTNode::FunctionCall { fn_name, argument } => {self.generate_code_funcall(fn_name, argument);()},
             _ => ()
         }
     }
@@ -189,21 +190,14 @@ impl Codegen {
                     format!("{num}")
 
                 }
-               
-                
-                   
-                   
-                
-                
-              
+ 
             },
             ASTNode::Identifier(id) => {
                 self.variables.get(&id).cloned().unwrap().tmp_name
-            }
+            },
+            ASTNode::FunctionCall{ fn_name, argument } => self.generate_code_funcall(fn_name, argument),
 
             _ => "".to_string()
-
-
         }
 
     }
@@ -266,6 +260,13 @@ impl Codegen {
 
         self.output.push_str("}\n");
         self.scope -= 1;
+        let fun_info = VarInfo{
+            tmp_name: format!("@{fn_name}"),
+            ty: llvm_ret_type,
+            scope: 1,
+        };
+        self.variables.insert(format!("{fn_name}"), fun_info);
+
     }
 
     fn generate_code_return(&mut self, ast:ASTNode){
@@ -294,7 +295,43 @@ impl Codegen {
         
     }
 
-   
+    fn generate_code_funcall(&mut self, fn_name:String, argument: Vec<ASTNode>)->String{
+      
+
+        let fun = self.variables.get(&fn_name).unwrap();
+        let ret_type = fun.ty.clone();
+        let mut values = Vec::new();
+        for i in argument{
+            let v = self.generate_code_expression(i);
+            let ptmp = self.tmp;
+            self.tmp += 1;
+            self.output.push_str(&format!("\t%{ptmp} = load i32, ptr {v}\n"));
+            values.push(format!("%{ptmp}"));
+
+            
+        }
+        let tmp = self.tmp;
+        self.tmp += 1;
+        self.output.push_str(&format!("\t%{tmp} = call {ret_type} @{fn_name}("));
+        for i in &values{
+            if i == values.last().unwrap() {
+                self.output.push_str(&format!("i32 {i}"));
+            }else{
+                self.output.push_str(&format!("i32 {i},"));
+            }
+            
+        }
+
+        let tmp2 = self.tmp;
+        self.tmp += 1;
+       
+
+        self.output.push_str(&format!(")\n"));
+        self.output.push_str(&format!("\t%{tmp2} = alloca i32 \n"));
+        self.output.push_str(&format!("\tstore i32 %{tmp}, ptr %{tmp2} \n"));
+        format!("%{tmp2}")
+
+    }
   
 
     

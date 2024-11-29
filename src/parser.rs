@@ -124,12 +124,12 @@ impl Parser {
             let para_name = handle_identifier(self.advance().unwrap().value.as_str())?;
             parameters.push((para_type, para_name));
             if self.peek().unwrap().token_type == TokenType::COMMA{
-                self.advance();
+                self.advance().unwrap();
             }
         }
         self.expect(TokenType::RPAREN, String::from(")"))?;
         let ret_type = if self.peek().unwrap().token_type == TokenType::ARROW{
-            self.advance();
+            self.advance().unwrap();
             Some(self.advance().unwrap().value.clone())
         }else{
             None
@@ -173,7 +173,7 @@ impl Parser {
         }
 
         self.expect(TokenType::RPAREN, String::from(")"))?;
-        self.expect(TokenType::SEMICOLON, String::from(";"))?;
+       
 
         Ok(ASTNode::FunctionCall { fn_name: fn_name, argument: args })
     }
@@ -219,7 +219,7 @@ impl Parser {
             TokenType::ID => {
                 
                 if self.peek().unwrap().token_type == TokenType::LPAREN{
-                    if !SYMBOL_TABLES.lock().unwrap().current_scope().has_function(token.value.as_str()) {
+                    if !SYMBOL_TABLES.lock().unwrap().stack[0].has_function(token.value.as_str()) {
                         return Err(format!("No Function: '{}' ", token.value));
                     } 
                     self.parse_function_call(token.value)
