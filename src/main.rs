@@ -81,7 +81,7 @@ fn main() {
 
             std::fs::write("output.ll", out).expect("Unable to write file");
 
-            let compile_status = Command::new("./tools/bin/clang")
+            let compile_status = Command::new("clang")
                 .arg("-o")
                 .arg(&output_file)
                 .arg("output.ll")
