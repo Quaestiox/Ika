@@ -84,8 +84,8 @@ impl Codegen {
                     let value = self.generate_code_expression(*expr);
                     let tmp2 = self.tmp;
                     self.tmp += 1;
-                    self.output.push_str(&format!("\t%{tmp2} = load i32, ptr {value}\n"));
-                    self.output.push_str(&format!("\tstore {llvm_var_type} {tmp2}, ptr %{tmp}\n"));
+                    self.output.push_str(&format!("\t%{tmp2} = load i32, {llvm_var_type}* {value}\n"));
+                    self.output.push_str(&format!("\tstore {llvm_var_type} {tmp2}, {llvm_var_type}* %{tmp}\n"));
                 }
                 None => ()
             }
@@ -139,11 +139,11 @@ impl Codegen {
 
                     let tmp_left = self.tmp;
                     self.tmp += 1;
-                    self.output.push_str(format!("\t%{tmp_left} = load i32, ptr {left}\n").as_str());
+                    self.output.push_str(format!("\t%{tmp_left} = load i32, i32* {left}\n").as_str());
 
                     let tmp_right = self.tmp;
                     self.tmp += 1;
-                    self.output.push_str(format!("\t%{tmp_right} = load i32, ptr {right}\n").as_str());
+                    self.output.push_str(format!("\t%{tmp_right} = load i32, i32* {right}\n").as_str());
 
                     let tmp_res = self.tmp;
                     self.tmp += 1;
@@ -162,7 +162,7 @@ impl Codegen {
                     let tmp_new = self.tmp;
                     self.tmp += 1;
                     self.output.push_str(format!("\t%{tmp_new} = alloca i32\n").as_str());
-                    self.output.push_str(format!("\tstore i32 %{tmp_res}, ptr %{tmp_new}\n").as_str());
+                    self.output.push_str(format!("\tstore i32 %{tmp_res}, i32* %{tmp_new}\n").as_str());
                     format!("%{tmp_new}")
                 } else{
                     let tmp_new = if op == "+"{
@@ -185,7 +185,7 @@ impl Codegen {
                     let tmp = self.tmp;
                     self.tmp += 1;
                     self.output.push_str(&format!("\t%{tmp} = alloca i32\n"));
-                    self.output.push_str(&format!("\tstore i32 {num}, ptr %{tmp}\n"));
+                    self.output.push_str(&format!("\tstore i32 {num}, i32* %{tmp}\n"));
                     format!("%{tmp}")
                 } else{
                     format!("{num}")
@@ -229,7 +229,7 @@ impl Codegen {
             let ltmp = self.tmp;
             self.tmp += 1;
             gen.push_str(format!("\t%{ltmp} = alloca {llvm_para_type}\n").as_str());
-            gen.push_str(format!("\tstore {llvm_para_type} %{para_name}, ptr %{ltmp}\n").as_str());
+            gen.push_str(format!("\tstore {llvm_para_type} %{para_name},{llvm_para_type}* %{ltmp}\n").as_str());
             self.output.push_str(&format!("{} %{}", llvm_para_type, para_name));
             let varinfo = VarInfo{
                 tmp_name: format!("%{ltmp}"),
@@ -276,7 +276,7 @@ impl Codegen {
         // let ty = var.ty.clone();
         let tmp = self.tmp;
         self.tmp += 1;
-        self.output.push_str(&format!("\t%{tmp} = load i32, ptr {value}\n"));
+        self.output.push_str(&format!("\t%{tmp} = load i32, i32* {value}\n"));
         self.output.push_str(&format!("\tret i32 %{tmp}\n"));
     }
 
@@ -286,11 +286,11 @@ impl Codegen {
         if llvm_var_info.scope != 1{
             let ty = llvm_var_info.ty;
             let var_name = llvm_var_info.tmp_name;
-            self.output.push_str(format!("\tstore {ty} {value}, ptr {var_name}\n").as_str());
+            self.output.push_str(format!("\tstore {ty} {value}, {ty}* {var_name}\n").as_str());
         }else{
             let ty = llvm_var_info.ty;
             let var_name = llvm_var_info.tmp_name;
-            self.output.push_str(format!("\tstore {ty} {value}, ptr {var_name}\n").as_str());
+            self.output.push_str(format!("\tstore {ty} {value}, {ty}* {var_name}\n").as_str());
         }
         
     }
@@ -306,7 +306,7 @@ impl Codegen {
             let v = self.generate_code_expression(i);
             let ptmp = self.tmp;
             self.tmp += 1;
-            self.output.push_str(&format!("\t%{ptmp} = load i32, ptr {v}\n"));
+            self.output.push_str(&format!("\t%{ptmp} = load i32, i32* {v}\n"));
             values.push(format!("%{ptmp}"));
 
             
@@ -347,7 +347,7 @@ impl Codegen {
 
         self.output.push_str(&format!(")\n"));
         self.output.push_str(&format!("\t%{tmp2} = alloca i32 \n"));
-        self.output.push_str(&format!("\tstore i32 %{tmp}, ptr %{tmp2} \n"));
+        self.output.push_str(&format!("\tstore i32 %{tmp}, i32* %{tmp2} \n"));
         format!("%{tmp2}")
     
 
