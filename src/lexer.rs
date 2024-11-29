@@ -106,6 +106,7 @@ impl<'a> LEXER<'a>{
             || value == String::from("in")
             || value == String::from("call")
             
+            
         {
             Token{
                 token_type: TokenType::KEYWORD,
@@ -152,7 +153,27 @@ impl<'a> LEXER<'a>{
         }
         
     }
- 
+    
+    fn collect_string(&mut self)->Token{
+        let mut value = String::new();
+        while let Some(&c) = self.src.peek(){
+            if c != '\"'{
+                value.push(c);
+                self.src.next();
+            }else{
+                self.src.next();
+                break;
+            }
+        }
+        
+        
+        Token{
+            token_type: TokenType::STRING,
+            value: value,
+        }
+
+
+    }
 
     
 
@@ -166,7 +187,7 @@ impl<'a> LEXER<'a>{
             Some('(') => Token{token_type: TokenType::LPAREN, value:String::from("(")},
             Some(')') => Token{token_type: TokenType::RPAREN, value:String::from(")")},
             Some('\'') => Token{token_type: TokenType::QUOTES, value:String::from("'")},
-            Some('"') => Token { token_type: TokenType::DQUOTES, value: String::from("\"")},
+            Some('"') => self.collect_string(),
             Some('+') => Token{token_type: TokenType::ADD, value:String::from("+")},
             Some('-') => self.collect_minus(),
             Some('*') => Token{token_type: TokenType::ASTERISK, value:String::from("*")},
@@ -297,5 +318,31 @@ mod tests{
         tokenization( &mut lexer);
         
 
+    }
+
+    #[test]
+    fn string(){
+        let input = "str a = \"aaa\";";
+       
+    
+        let mut lexer = LEXER::new(input);
+        let mut tokens:Vec<Token> = Vec::new();
+
+        while let Some(ctk) = lexer.next_token(){
+            tokens.push(ctk);
+        }
+
+        let right_result = vec![
+            Token { token_type: TokenType::KEYWORD, value: String::from("str") },
+            Token { token_type: TokenType::ID, value: String::from("a") },
+            Token { token_type: TokenType::EQUALS, value: String::from("=")},
+            Token { token_type: TokenType::STRING, value: String::from("aaa")},
+            Token { token_type: TokenType::SEMICOLON, value: String::from(";") },
+           
+        ];     
+
+        assert_eq!(tokens, right_result);
+
+        tokenization( &mut lexer);
     }
 }

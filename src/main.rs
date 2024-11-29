@@ -6,6 +6,7 @@ mod codegen;
 
 use clap::{Parser as cp};
 use std::process::{Command, exit};
+use std::env;
 use codegen::Codegen;
 use lexer::{LEXER, tokenization,Token,TokenType};
 use parser::{Parser};
@@ -37,10 +38,24 @@ struct Cli {
     input: String,
 }
 
+pub struct SrcInfo{
+   target_triple:String,
+}
 
 fn main() {
    
     let cli = Cli::parse();
+    
+    let tt = match env::consts::OS {
+        "windows" => "x86_64-pc-windows-msvc".to_string(),
+        "linux" => "x86_64-unknown-linux-gnu".to_string(),
+        "macos" => "x86_64-apple-darwin".to_string(),
+        "freebsd" => "x86_64-unknown-freebsd".to_string(),
+        _ => "x86_64-unknown-linux-gnu".to_string(), // 默认是 Linux
+    };
+    let src_info = SrcInfo{
+        target_triple: tt
+    };
 
     let input_file = &cli.input;
     let output_file = cli.output.unwrap_or_else(|| "a.out".to_string());
@@ -77,12 +92,14 @@ fn main() {
                 println!("{:#?}", ast);
             }
             
-            let out = codegen.generate_code(ast);
+            let out = codegen.generate_code(ast, src_info);
+            
 
             std::fs::write("output.ll", out).expect("Unable to write file");
 
             let compile_status = Command::new("clang")
-                .arg("-o")
+                .arg("-Wno-override-module")
+                .arg("-o") 
                 .arg(&output_file)
                 .arg("output.ll")
                 .status()

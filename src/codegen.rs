@@ -1,5 +1,6 @@
 use crate::parser::{ASTNode};
 use crate::lexer::{TokenType};
+use crate::SrcInfo;
 use core::net;
 use std::collections::HashMap;
 
@@ -28,12 +29,15 @@ impl Codegen {
     }
 
 
-    pub fn generate_code(&mut self, ast:ASTNode) -> &String{
-        self.generate_program(ast);
+    pub fn generate_code(&mut self, ast:ASTNode, info:SrcInfo) -> &String{
+        self.generate_program(ast, info);
         &self.output 
     }
 
-    pub fn generate_program(&mut self, ast:ASTNode) {
+    pub fn generate_program(&mut self, ast:ASTNode, info:SrcInfo) {
+        let tt =info.target_triple;
+        self.output.push_str(&format!("target triple = \"{tt}\"\n"));
+      
         if let ASTNode::Program(vec) = ast{
             for stat in vec{
                 self.generate_statement(stat);
@@ -73,6 +77,7 @@ impl Codegen {
         
         let llvm_var_type = turn_to_llvm_type(var_type).unwrap();
 
+        
 
         if self.scope != 1{
             let tmp = self.tmp;
@@ -193,6 +198,21 @@ impl Codegen {
                 }
  
             },
+            ASTNode::String(value)=>{
+                let len = value.len() + 1;
+                if self.scope != 1{
+                    let tmp = self.tmp;
+                    self.tmp += 1;
+                    self.output.push_str(&format!("\t%{tmp} = alloca [{len} x i8]\n"));
+                    self.output.push_str(&format!("\tstore [{len} x i8] c\"{value}\\00\", [{len} x i8]* %{tmp}\n"));
+                    format!("%{tmp}")
+                } else{
+                    format!("[{len} x i8] c\"{value}\\00\"")
+
+                }
+ 
+
+            }
             ASTNode::Identifier(id) => {
                 self.variables.get(&id).cloned().unwrap().tmp_name
             },
@@ -242,6 +262,7 @@ impl Codegen {
         self.output.push_str(") {\n");
         self.output.push_str(&gen);
         
+        self.tmp += 1;
 
         self.scope += 1;
        
@@ -309,7 +330,7 @@ impl Codegen {
             self.output.push_str(&format!("\t%{ptmp} = load i32, i32* {v}\n"));
             values.push(format!("%{ptmp}"));
 
-            
+        
         }
 
         if ret_type == "void".to_string(){
@@ -352,20 +373,15 @@ impl Codegen {
     
 
         }
-       
-       
-        
 
-    }
-  
-
-    
+    } 
 }
 
 
 fn turn_to_llvm_type(ty: String) -> Result<String, String> {
     match ty.as_str() {
         "i32" => Ok("i32".to_string()),
+        "str" => Ok("i32".to_string()),
         "void" => Ok("void".to_string()),
         _ => Err(format!("Cannot turn type '{}' to LLVM type", ty)),
     }
