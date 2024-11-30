@@ -1,14 +1,6 @@
-i32 global = 1;
 str h1 = "Hello, ";
-sub add(i32 a, i32 b)->i32{
-    ret a + b;
-}
 sub main(){
-    i32 g = @global;
-    i32 x = add(2, g);
     str h2 = "World"; 
     echo(@h1, 7);
     echo(h2, 5);
-    
 }
-

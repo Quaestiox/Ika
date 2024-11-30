@@ -1,10 +1,10 @@
 
-# Ika
+# ika
 
-### Ika is a purely handwritten programming language which I designed to learn how to write compilers in Rust.
+### ika is a purely handwritten programming language which I designed to learn how to write compilers in Rust.
 
 ## Features
-The ika compiler compiles the Ika source code file into an LLVM intermediate representation and then compiles it into an executable file
+The ika compiler compiles the ika source code file into an LLVM intermediate representation and then compiles it into an executable file
 
 ## Download 
 
