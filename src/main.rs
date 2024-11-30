@@ -3,6 +3,7 @@ mod parser;
 mod sema;
 mod io;
 mod codegen;
+mod codegen_lib;
 
 use clap::{Parser as cp};
 use std::process::{Command, exit};
@@ -92,7 +93,8 @@ fn main() {
                 println!("{:#?}", ast);
             }
             
-            let out = codegen.generate_code(ast, src_info);
+            let out = codegen.generate_code(ast, src_info).clone();
+            println!("{:?}", codegen.sym_table);
             
 
             std::fs::write("output.ll", out).expect("Unable to write file");

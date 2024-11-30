@@ -1,22 +1,35 @@
 use crate::parser::{ASTNode};
 use crate::lexer::{TokenType};
+use crate::sema::Function;
 use crate::SrcInfo;
 use core::net;
 use std::collections::HashMap;
-
+use std::vec;
+use crate::codegen_lib::{generate_lib};
 pub struct Codegen {
     output: String,
     tmp: i64,
-    scope: i32,
-    variables: HashMap<String, VarInfo>, 
+    scope: usize,
+    pub sym_table: Vec<HashMap<String, Info>>, 
 }
 
 #[derive(Debug, Clone)]
-pub struct VarInfo{
-    tmp_name: String,
-    ty:String,
-    scope: i32,
+pub enum Info{
+    Variable{
+        tmp_name:String,
+        ty:String,
+        scope: usize,
+        size: i64,
+    },
+    Function{
+        tmp_name:String,
+        ret_ty: String,
+        paras: Vec<String>,
+        scope:usize,
+    }
 }
+
+
 
 impl Codegen {
     pub fn new() -> Self {
@@ -24,19 +37,75 @@ impl Codegen {
             output: String::new(),
             tmp: 0,
             scope: 1,
-            variables: HashMap::new(),
+            sym_table: Vec::new(),
         }
     }
 
+    fn new_tmp(&mut self) -> i64{
+        let tmp = self.tmp;
+        self.tmp += 1;
+        tmp
+    }
+
+    fn add_to_symbol(&mut self, scope:usize, name:String, info:Info){
+        
+        let t = &mut self.sym_table;
+        let a = t.get_mut(scope).unwrap();
+        a.insert(name, info);
+    }
+
+    fn get_funinfo(&self, name: String) -> Option<(String, String, Vec<String>, usize)>{
+        let fun =self.sym_table.get(1).clone().unwrap().get(&name).unwrap().clone();
+        match fun {
+            Info::Function { tmp_name, ret_ty, paras, scope } 
+                => Some((tmp_name, ret_ty, paras, scope)),
+            _ => None
+        }
+    }
+
+    fn get_varinfo(&self, name:String)->Option<(String, String, usize, i64)>{
+        let mut s =self.scope;
+        while s >= 1{
+            let a = self.sym_table.get(s ).clone().unwrap();
+            let v = a.get(&name).cloned();
+            if v.is_none(){
+                s -= 1;
+            }else{
+                break;
+            }
+        }
+
+        if s < 1{
+            None
+        }else{
+            let var =self.sym_table.get(s).clone().unwrap().get(&name).cloned().unwrap().clone();
+            match var {
+                Info::Variable { tmp_name, ty, scope, size }
+                   => Some((tmp_name, ty, scope, size)),
+                _ => None
+            }
+        } 
+    }
 
     pub fn generate_code(&mut self, ast:ASTNode, info:SrcInfo) -> &String{
+
+        self.sym_table.push(HashMap::new());
+        self.sym_table.push(HashMap::new());
+        self.sym_table.push(HashMap::new());
+     
+
         self.generate_program(ast, info);
         &self.output 
     }
 
     pub fn generate_program(&mut self, ast:ASTNode, info:SrcInfo) {
+        
         let tt =info.target_triple;
         self.output.push_str(&format!("target triple = \"{tt}\"\n"));
+
+        self.output.push_str(&generate_lib());
+        self.add_to_symbol(1, "echo".to_string(), Info::Function { tmp_name: "echo".to_string(), ret_ty: "i32".to_string(), paras:Vec::from(["i8*".to_string(),"i32".to_string()]), scope: 1 });
+
       
         if let ASTNode::Program(vec) = ast{
             for stat in vec{
@@ -87,19 +156,18 @@ impl Codegen {
             match var_value{
                 Some(expr) => {
                     let value = self.generate_code_expression(*expr);
-                    let tmp2 = self.tmp;
-                    self.tmp += 1;
-                    self.output.push_str(&format!("\t%{tmp2} = load i32, {llvm_var_type}* {value}\n"));
-                    self.output.push_str(&format!("\tstore {llvm_var_type} {tmp2}, {llvm_var_type}* %{tmp}\n"));
+                    // if llvm_var_type != "i8*"{
+                        let tmp2 = self.tmp;
+                        self.tmp += 1;
+                        self.output.push_str(&format!("\t%{tmp2} = load {llvm_var_type}, {llvm_var_type}* {value}\n"));
+                        self.output.push_str(&format!("\tstore {llvm_var_type} %{tmp2}, {llvm_var_type}* %{tmp}\n"));
+                    // }
+                    // else{}
                 }
                 None => ()
             }
-            let varinfo = VarInfo{
-                tmp_name: format!("%{tmp}"),
-                ty:llvm_var_type,
-                scope:2,
-            };
-            self.variables.insert(identifier, varinfo);
+            let varinfo = Info::Variable { tmp_name: format!("%{tmp}"), ty:llvm_var_type, scope: self.scope, size: 32 };
+            self.add_to_symbol(self.scope, identifier, varinfo);
         } else{
             let tmp = self.tmp;
             self.tmp += 1;
@@ -114,17 +182,12 @@ impl Codegen {
                     self.output.push_str(&format!(" 0\n"));
                 }
             }
-            let varinfo = VarInfo{
-                tmp_name: format!("@{tmp}"),
-                ty:llvm_var_type,
-                scope:1,
-            };
-            self.variables.insert(identifier, varinfo);
+            let varinfo = Info::Variable { tmp_name: format!("@{tmp}"), ty:llvm_var_type, scope: 1, size: 32 };
+            self.add_to_symbol(self.scope, identifier, varinfo);
 
         }
 
     }
-
 
     fn generate_code_expression(&mut self, ast:ASTNode) -> String{
         match ast{
@@ -167,7 +230,7 @@ impl Codegen {
                     let tmp_new = self.tmp;
                     self.tmp += 1;
                     self.output.push_str(format!("\t%{tmp_new} = alloca i32\n").as_str());
-                    self.output.push_str(format!("\tstore i32 %{tmp_res}, i32* %{tmp_new}\n").as_str());
+                    self.output.push_str(format!("\tstore i32 %{tmp_res}, ptr %{tmp_new}\n").as_str());
                     format!("%{tmp_new}")
                 } else{
                     let tmp_new = if op == "+"{
@@ -214,7 +277,10 @@ impl Codegen {
 
             }
             ASTNode::Identifier(id) => {
-                self.variables.get(&id).cloned().unwrap().tmp_name
+          
+                self.get_varinfo(id).unwrap().0
+                
+                
             },
             ASTNode::FunctionCall{ fn_name, argument } => self.generate_code_funcall(fn_name, argument),
 
@@ -223,16 +289,26 @@ impl Codegen {
 
     }
 
-
     pub fn generate_code_fundef(&mut self,fn_name:String, parameters:Vec<(String, String)>, ret_type:Option<String>, body:Vec<ASTNode>){
         let llvm_ret_type = match ret_type {
-            Some(ty) => turn_to_llvm_type(ty).unwrap(),
+            Some(ty) => {
+                if ty == "str".to_string(){
+                    "i8*".to_string()
+                }else{
+                    ty
+                }
+            }
             None => "void".to_string(),
         };
         self.output.push_str(&format!(
             "define {} @{}(",
             llvm_ret_type, fn_name
         ));
+
+        let mut tylist = Vec::new();
+        for p in parameters.clone(){
+            tylist.push(p.0);
+        }
 
         let mut gen = String::new();
 
@@ -249,21 +325,17 @@ impl Codegen {
             let ltmp = self.tmp;
             self.tmp += 1;
             gen.push_str(format!("\t%{ltmp} = alloca {llvm_para_type}\n").as_str());
-            gen.push_str(format!("\tstore {llvm_para_type} %{para_name},{llvm_para_type}* %{ltmp}\n").as_str());
+            gen.push_str(format!("\tstore {llvm_para_type} %{para_name},ptr %{ltmp}\n").as_str());
             self.output.push_str(&format!("{} %{}", llvm_para_type, para_name));
-            let varinfo = VarInfo{
-                tmp_name: format!("%{ltmp}"),
-                ty: llvm_para_type.clone(),
-                scope: 2,
-                
-            };
-            self.variables.insert(para_name.clone(), varinfo);
+
+           let varinfo = Info::Variable { tmp_name: format!("%{ltmp}"), ty:llvm_para_type.clone(), scope: 2, size: 32 };
+            self.add_to_symbol(self.scope, para_name.clone(), varinfo);
         }
+
         self.output.push_str(") {\n");
         self.output.push_str(&gen);
         
         self.tmp += 1;
-
         self.scope += 1;
        
         if llvm_ret_type == "void".to_string(){
@@ -281,12 +353,8 @@ impl Codegen {
 
         self.output.push_str("}\n");
         self.scope -= 1;
-        let fun_info = VarInfo{
-            tmp_name: format!("@{fn_name}"),
-            ty: llvm_ret_type,
-            scope: 1,
-        };
-        self.variables.insert(format!("{fn_name}"), fun_info);
+        let funinfo = Info::Function { tmp_name: fn_name.clone(), ret_ty: llvm_ret_type.clone(), paras: tylist.clone(), scope: 1 };
+        self.add_to_symbol(self.scope, fn_name, funinfo);
 
     }
 
@@ -302,16 +370,16 @@ impl Codegen {
     }
 
     fn generate_code_assignment(&mut self,  identifier: String, var_value: Option<Box<ASTNode>>,){  
-        let llvm_var_info = self.variables.get(&identifier).cloned().unwrap();
+        let var = self.get_varinfo(identifier).unwrap();
         let value = self.generate_code_expression(*var_value.unwrap());
-        if llvm_var_info.scope != 1{
-            let ty = llvm_var_info.ty;
-            let var_name = llvm_var_info.tmp_name;
-            self.output.push_str(format!("\tstore {ty} {value}, {ty}* {var_name}\n").as_str());
+        if var.2 != 1{
+            let ty = var.1;
+            let var_name = var.0;
+            self.output.push_str(format!("\tstore {ty} {value}, ptr {var_name}\n").as_str());
         }else{
-            let ty = llvm_var_info.ty;
-            let var_name = llvm_var_info.tmp_name;
-            self.output.push_str(format!("\tstore {ty} {value}, {ty}* {var_name}\n").as_str());
+            let ty = var.1;
+            let var_name = var.0;
+            self.output.push_str(format!("\tstore {ty} {value}, ptr {var_name}\n").as_str());
         }
         
     }
@@ -319,27 +387,38 @@ impl Codegen {
     fn generate_code_funcall(&mut self, fn_name:String, argument: Vec<ASTNode>)->String{
       
 
-        let fun = self.variables.get(&fn_name).unwrap();
-        let ret_type = fun.ty.clone();
+        let fun =self.get_funinfo(fn_name.clone()).unwrap();
+        let tylist = &fun.2;
+        let ret_type = fun.1.clone();
         let mut values = Vec::new();
 
-        for i in argument{
-            let v = self.generate_code_expression(i);
-            let ptmp = self.tmp;
-            self.tmp += 1;
-            self.output.push_str(&format!("\t%{ptmp} = load i32, i32* {v}\n"));
-            values.push(format!("%{ptmp}"));
+        for i in 0..argument.len(){
+            let ast = argument.get(i).unwrap().clone();
+            let v = self.generate_code_expression(ast);
+            let t = tylist.get(i).unwrap();
+
+            if tylist[i] != "i8*"{
+                let ptmp = self.tmp;
+                self.tmp += 1;
+                self.output.push_str(&format!("\t%{ptmp} = load {t} , {t}* {v}\n"));
+                values.push(format!("%{ptmp}"));
+            } else{
+                values.push(format!("{v}"));
+            }
+           
 
         
         }
 
         if ret_type == "void".to_string(){
             self.output.push_str(&format!("\tcall void @{fn_name}("));
-            for i in &values{
-                if i == values.last().unwrap() {
-                    self.output.push_str(&format!("i32 {i}"));
+            for i in 0..values.len(){
+                let v = values.get(i).unwrap();
+                let t = tylist.get(i).unwrap();
+                if v == values.last().unwrap() {
+                    self.output.push_str(&format!("{t} {v}"));
                 }else{
-                    self.output.push_str(&format!("i32 {i},"));
+                    self.output.push_str(&format!("{t} {v},"));
                 }
                 
             }
@@ -354,11 +433,13 @@ impl Codegen {
             let tmp = self.tmp;
             self.tmp += 1;
             self.output.push_str(&format!("\t%{tmp} = call {ret_type} @{fn_name}("));
-            for i in &values{
-                if i == values.last().unwrap() {
-                    self.output.push_str(&format!("i32 {i}"));
+            for i in 0..values.len(){
+                let v = values.get(i).unwrap();
+                let t = tylist.get(i).unwrap();
+                if v == values.last().unwrap() {
+                    self.output.push_str(&format!("{t} {v}"));
                 }else{
-                    self.output.push_str(&format!("i32 {i},"));
+                    self.output.push_str(&format!("{t} {v},"));
                 }
                 
             }
@@ -368,7 +449,7 @@ impl Codegen {
 
         self.output.push_str(&format!(")\n"));
         self.output.push_str(&format!("\t%{tmp2} = alloca i32 \n"));
-        self.output.push_str(&format!("\tstore i32 %{tmp}, i32* %{tmp2} \n"));
+        self.output.push_str(&format!("\tstore i32 %{tmp}, ptr %{tmp2} \n"));
         format!("%{tmp2}")
     
 
@@ -381,7 +462,7 @@ impl Codegen {
 fn turn_to_llvm_type(ty: String) -> Result<String, String> {
     match ty.as_str() {
         "i32" => Ok("i32".to_string()),
-        "str" => Ok("i32".to_string()),
+        "str" => Ok("i8*".to_string()),
         "void" => Ok("void".to_string()),
         _ => Err(format!("Cannot turn type '{}' to LLVM type", ty)),
     }

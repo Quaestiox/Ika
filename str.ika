@@ -1,4 +1,5 @@
 sub main(){
     str a = "a";
+    echo(a);
 }
 
