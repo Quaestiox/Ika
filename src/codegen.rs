@@ -171,7 +171,12 @@ impl Codegen {
         } else{
             let tmp = self.tmp;
             self.tmp += 1;
-            self.output.push_str(&format!("@{tmp} = global {llvm_var_type}"));
+            if llvm_var_type != "i8*"{
+                self.output.push_str(&format!("@{tmp} = global {llvm_var_type}"));
+            } else{
+                self.output.push_str(&format!("@{tmp} = global "));
+            }
+           
            
             match var_value{
                 Some(expr) => {

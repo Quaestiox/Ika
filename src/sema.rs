@@ -1,6 +1,8 @@
+use core::arch;
 use std::collections::HashMap;
 use lazy_static::lazy_static;
 use std::sync::{Arc, Mutex};
+use crate::parser::{ASTNode};
 
 #[derive(Debug)]
 pub struct SymbolTable{
@@ -83,6 +85,13 @@ impl ScopeManager{
         self.stack.last().unwrap()
     }
 
+    pub fn global_scope(&self) -> &SymbolTable {
+        self.stack.first().unwrap()
+    }
+    pub fn global_scope_mut(&mut self) -> &mut SymbolTable {
+        self.stack.first_mut().unwrap()
+    }
+
     pub fn is_global_scope(&self) -> bool{
         if self.stack.len() == 1{
             true
@@ -98,7 +107,32 @@ lazy_static!{
     
 }
 
+pub fn lib_insert_symbol(){
+    SYMBOL_TABLES.lock().unwrap().global_scope_mut().add_function("echo".to_string(),  Function {
+        fn_name: "echo".to_string(),
+        paras: Vec::from([("str".to_string(), "string".to_string()),( "i32".to_string(), "len".to_string())]),
+        ret_type: None,
+    });
+}
 
+pub fn get_var(name: String)->String{
+    let sym = SYMBOL_TABLES.lock().unwrap();
+    let info = sym.global_scope().lookup_variable(name.as_str()).unwrap().clone();
+    info
+}
+
+pub fn get_fun(name: String)->Function{
+    let sym = SYMBOL_TABLES.lock().unwrap();
+    let info = sym.global_scope().lookup_function(name.as_str()).unwrap().clone();
+    let a = info.fn_name.clone();
+    let b = info.paras.clone();
+    let c = info.ret_type.clone();
+    Function{
+        fn_name: a,
+        paras: b,
+        ret_type:c
+    } 
+}
 
 #[cfg(test)]
 mod tests{

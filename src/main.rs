@@ -11,7 +11,7 @@ use std::env;
 use codegen::Codegen;
 use lexer::{LEXER, tokenization,Token,TokenType};
 use parser::{Parser};
-use sema::{SymbolTable, SYMBOL_TABLES};
+use sema::{lib_insert_symbol, SymbolTable, SYMBOL_TABLES};
 use io::{read_fs};
 
 #[derive(cp)]
@@ -85,8 +85,11 @@ fn main() {
     
     let mut parser = Parser::new(tokens.clone());
     let mut codegen = Codegen::new();
+
+    lib_insert_symbol();
     
     match parser.parse_program() {
+        
         Ok(ast) => {
 
             if cli.show_ast{
@@ -94,8 +97,7 @@ fn main() {
             }
             
             let out = codegen.generate_code(ast, src_info).clone();
-            println!("{:?}", codegen.sym_table);
-            
+           
 
             std::fs::write("output.ll", out).expect("Unable to write file");
 
@@ -116,5 +118,7 @@ fn main() {
         },
         Err(err) => eprintln!("Error: {}", err),
     }
+    
+    
 
 }

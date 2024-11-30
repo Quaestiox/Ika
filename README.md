@@ -17,6 +17,15 @@ git clone git@github.com:Quaestiox/Ika.git
 
 Since the compiler uses LLVM IR as the intermediate code, you need to make sure you have Clang before using it (not compatible with very old versions now): [Download LLVM here](https://github.com/llvm/llvm-project/releases)
 
+try to write something:
+```
+str h1 = "Hello, ";
+sub main(){
+    str h2 = "World"; 
+    echo(@h1, 7);
+    echo(h2, 5);
+}
+```
 
 compile the Ika source file:
 ```

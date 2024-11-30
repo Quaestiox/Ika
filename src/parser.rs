@@ -1,4 +1,4 @@
-use crate::lexer::{Token,TokenType, Error, LEXER, tokenization};
+use crate::{lexer::{tokenization, Error, Token, TokenType, LEXER}, sema::{get_fun, get_var}};
 use std::collections::HashMap;
 use crate::sema::{SYMBOL_TABLES,Function};
 
@@ -103,9 +103,14 @@ impl Parser {
                     }
                     TokenType::LPAREN =>{
                         
-                        let ast =self.parse_function_call(token.value.clone());
-                        self.expect(TokenType::SEMICOLON, String::from(";"))?;
-                        ast
+                        let res = self.parse_function_call(token.value.clone());
+                        if res.is_err(){
+                            res
+                        }else{
+                            self.expect(TokenType::SEMICOLON, String::from(";"))?;
+                            res
+                        }
+                        
                     }
                     _ => Err(format!("Invalid symbol {:?}",cur))
                 }
@@ -166,14 +171,32 @@ impl Parser {
     fn parse_function_call(&mut self, fn_name:String ) -> Result<ASTNode, String>{
         self.expect(TokenType::LPAREN, String::from("("))?;
         let mut args = Vec::new();
+      
+        if !SYMBOL_TABLES.lock().unwrap().global_scope().has_function(fn_name.as_str()){
+            return Err(format!("No function '{}' ", fn_name));
+        }
+        let info = get_fun(fn_name.clone());
+
+        let mut tylist = Vec::new();
+
+        for i in info.paras.clone(){
+            tylist.push(i.0);
+        }
+        
         while self.peek().unwrap().token_type != TokenType::RPAREN{
             let arg = self.parse_expression()?;
-           
+            
             args.push(arg);
 
             if self.peek().unwrap().token_type == TokenType::COMMA{
                 self.advance();
             }
+        }
+
+        if (args.len() != info.paras.len()){
+            let len = info.paras.len();
+            let alen = args.len();
+            return Err(format!("function {fn_name} need {len} parameters, but find {alen}."));
         }
 
         self.expect(TokenType::RPAREN, String::from(")"))?;
