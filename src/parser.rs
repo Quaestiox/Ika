@@ -30,6 +30,16 @@ pub enum ASTNode {
         op: String,
         right_expr:Box<ASTNode>,
     },
+    IfElse{
+        condition: Box<ASTNode>,
+        if_body: Vec<ASTNode>,
+        elif_body:  Option<Vec<ASTNode>>,
+        else_body: Option<Vec<ASTNode>>,
+    },
+    While{
+        condition: Box<ASTNode>,
+        body: Vec<ASTNode>,
+    },
     Return(Box<ASTNode>),
     Expression(Box<ASTNode>),
     Number(String),
@@ -91,6 +101,8 @@ impl Parser {
                     "sub" => self.parse_function_definition(),
                     "ret" => self.parse_return(),
                     "i32" | "str" => self.parse_variable_definition(),
+                    "while" => self.parse_while(),
+                    "if" => self.parse_if_else(),
                     _ => Err(format!("parse_statement error"))
                 }
             }
@@ -150,8 +162,9 @@ impl Parser {
         for i in &parameters{
             SYMBOL_TABLES.lock().unwrap().current_scope_mut().add_variable(i.1.clone(),i.0.clone());
         }
-        let body = self.parse_block()?;
         SYMBOL_TABLES.lock().unwrap().pop_scope();
+        let body = self.parse_block()?;
+        
         Ok(ASTNode::FunctionDefinition { 
             fn_name, 
             parameters, 
@@ -309,8 +322,34 @@ impl Parser {
         Ok(primary)
     }
 
+    
+    fn parse_expression_third(&mut self) -> Result<ASTNode, String>{
+        let mut primary = self.parse_expression_secondary()?;
+
+        while let Ok(token) = self.peek(){
+            if token.token_type == TokenType::DEQUALS 
+                || token.token_type == TokenType::LT
+                || token.token_type == TokenType::LE
+                || token.token_type == TokenType::ST
+                || token.token_type == TokenType::SE
+                || token.token_type == TokenType::UNEQ
+            {
+                let op = self.advance().unwrap().value.clone();
+                let right_expr = self.parse_expression_secondary()?;
+                primary = ASTNode::InfixExpression {
+                    left_expr:Box::new(primary),
+                    op,
+                    right_expr:Box::new(right_expr),
+                }
+            } else{
+                break;
+            }
+        }
+        Ok(primary)
+    }
+
     fn parse_expression(&mut self) -> Result<ASTNode, String>{
-        let mut node = self.parse_expression_secondary()?;
+        let mut node = self.parse_expression_third()?;
 
         while let Ok(token) = self.peek() {
             if token.token_type == TokenType::ADD || token.token_type == TokenType::MINUS{
@@ -329,13 +368,79 @@ impl Parser {
         Ok(node)
     }
 
+    fn parse_while(&mut self) -> Result<ASTNode, String>{
+        self.expect(TokenType::KEYWORD, String::from("while"))?; 
+           
+        let condition = self.parse_expression()?;                
+           
+    
+           
+        let body = self.parse_block()?;                         
+    
+        Ok(ASTNode::While {
+          condition: Box::new(condition),
+          body,
+        })
+
+    }
+
+    fn parse_if_else(&mut self) -> Result<ASTNode, String>{
+        self.expect(TokenType::KEYWORD, String::from("if"))?; 
+    
+        let condition = self.parse_expression()?;             
+    
+        
+        let if_body = self.parse_block()?;                    
+    
+        let mut else_body = None;
+        let mut elif_body = None;
+        loop{
+            if self.peek().unwrap().token_type == TokenType::KEYWORD && self.peek().unwrap().value == "elif" {
+                self.advance().unwrap(); 
+                if self.peek().unwrap().token_type == TokenType::LBRACE {
+                    elif_body = Some(self.parse_block()?); 
+                } else {
+                    return Err(format!("Expected block after 'elif'"));
+                }
+                if self.peek().unwrap().token_type == TokenType::KEYWORD 
+                    && (self.peek().unwrap().value == "else"
+                    || self.peek().unwrap().value == "elif"){
+                        continue;
+                }
+                break;
+            } else if self.peek().unwrap().token_type == TokenType::KEYWORD && self.peek().unwrap().value == "else"{
+                self.advance().unwrap(); 
+                if self.peek().unwrap().token_type == TokenType::LBRACE {
+                    else_body = Some(self.parse_block()?); 
+                } else {
+                    return Err(format!("Expected block after 'else'"));
+                }
+                break;
+            }
+
+        }
+        
+    
+        Ok(ASTNode::IfElse {
+            condition: Box::new(condition),
+            if_body,
+            elif_body,
+            else_body,
+        })
+
+    }
+
     fn parse_block(&mut self) -> Result<Vec<ASTNode>, String>{
+        SYMBOL_TABLES.lock().unwrap().push_scope();
+       
+       
         self.expect(TokenType::LBRACE, String::from("{"))?;
         let mut statements = Vec::new();
         while self.peek().unwrap().token_type != TokenType::RBRACE{
             statements.push(self.parse_statement()?);
         }
         self.expect(TokenType::RBRACE, String::from("}"));
+        SYMBOL_TABLES.lock().unwrap().pop_scope();
         Ok(statements)
     }
 }

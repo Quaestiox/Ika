@@ -1,5 +1,14 @@
 str h1 = "Hello, ";
 sub main(){
+    if 1 == 2 {
+        i32 a = 3 + 4;
+    }elif{
+        i32 a = 5;
+    }
+
+    while true{
+        i32 a = 5;
+    }
     str h2 = "World"; 
     echo(@h1, 7);
     echo(h2, 5);

@@ -1,5 +1,5 @@
 
-# ika
+# Ika
 
 ### ika is a purely handwritten programming language which I designed to learn how to write compilers in Rust.
 
@@ -9,7 +9,7 @@ The ika compiler compiles the ika source code file into an LLVM intermediate rep
 ## Download 
 
 ```
-git clone git@github.com:Quaestiox/Ika.git
+git clone git@github.com:Quaestiox/ika.git
 ```
 
 

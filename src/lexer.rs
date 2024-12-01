@@ -9,6 +9,11 @@ pub enum TokenType{
     CHAR,
     STRING,
     EQUALS,
+    DEQUALS,
+    LT,
+    LE,
+    ST,
+    SE,
     ADD,
     MINUS,
     ASTERISK,
@@ -19,6 +24,8 @@ pub enum TokenType{
     LPAREN,
     RPAREN,
     QUOTES,
+    EX,
+    UNEQ,
     DQUOTES,
     SLASH,
     COMMA,
@@ -96,11 +103,13 @@ impl<'a> LEXER<'a>{
         }
 
         if value == String::from("i32")
+            || value == String::from("bool")
             || value == String::from("str")
             || value == String::from("ret")
             || value == String::from("sub")
             || value == String::from("if")
             || value == String::from("else")
+            || value == String::from("elif")
             || value == String::from("while")
             || value == String::from("for")
             || value == String::from("in")
@@ -112,7 +121,18 @@ impl<'a> LEXER<'a>{
                 token_type: TokenType::KEYWORD,
                 value: value,
             }
-        } else {
+        } else if value == "true".to_string(){
+            Token{
+                token_type: TokenType::NUMBER,
+                value: "1".to_string(),
+            }
+        } else if value == "false".to_string(){
+            Token{
+                token_type: TokenType::NUMBER,
+                value: "0".to_string(),
+            }
+        }
+        else {
             Token{
                 token_type: TokenType::ID,
                 value: value,
@@ -175,11 +195,65 @@ impl<'a> LEXER<'a>{
 
     }
 
+    fn collect_eq(&mut self)-> Token{
+        let c = self.src.peek().unwrap();
+        if *c == '='{
+            self.src.next();
+            Token{
+                token_type: TokenType::DEQUALS,
+                value:String::from("=="),
+            }
+        }else{
+            Token{token_type: TokenType::EQUALS, value:String::from("=")}
+        }
+    }
+
+    fn collect_lt(&mut self)-> Token{
+        let c = self.src.peek().unwrap();
+        if *c == '='{
+            self.src.next();
+            Token{
+                token_type: TokenType::LE,
+                value:String::from(">="),
+            }
+        }else{
+            Token{token_type: TokenType::LT, value:String::from(">")}
+        }
+    }
+    
+    fn collect_st(&mut self)-> Token{
+        let c = self.src.peek().unwrap();
+        if *c == '='{
+            self.src.next();
+            Token{
+                token_type: TokenType::SE,
+                value:String::from("<="),
+            }
+        }else{
+            Token{token_type: TokenType::ST, value:String::from("<")}
+        }
+    }
+
+    fn collect_ex(&mut self)-> Token{
+        let c = self.src.peek().unwrap();
+        if *c == '='{
+            self.src.next();
+            Token{
+                token_type: TokenType::UNEQ,
+                value:String::from("!="),
+            }
+        }else{
+            Token{token_type: TokenType::EX, value:String::from("!")}
+        }
+    }
+    
     
 
     fn collect_symbol(&mut self)->Token{
         match self.src.next(){
-            Some('=') => Token{token_type: TokenType::EQUALS, value:String::from("=")},
+            Some('=') => self.collect_eq(),
+            Some('>') => self.collect_lt(),
+            Some('<') => self.collect_st(),
             Some(';') => Token{token_type: TokenType::SEMICOLON, value:String::from(";")},
             Some(':') => Token{token_type: TokenType::COLON, value:String::from(":")},
             Some('{') => Token{token_type: TokenType::LBRACE, value:String::from("{")},
@@ -193,6 +267,7 @@ impl<'a> LEXER<'a>{
             Some('*') => Token{token_type: TokenType::ASTERISK, value:String::from("*")},
             Some(',') => Token{token_type: TokenType::COMMA, value:String::from(",")},
             Some('@') => Token{token_type: TokenType::AT, value:String::from("@")},
+            Some('!') => self.collect_ex(),
             _ => Token{token_type:TokenType::EOF, value: String::from("")}
 
         }

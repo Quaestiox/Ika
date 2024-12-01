@@ -46,20 +46,31 @@ pub struct SrcInfo{
 fn main() {
    
     let cli = Cli::parse();
+
+    let os = env::consts::OS;
     
-    let tt = match env::consts::OS {
+    let tt = match os {
         "windows" => "x86_64-pc-windows-msvc".to_string(),
         "linux" => "x86_64-unknown-linux-gnu".to_string(),
         "macos" => "x86_64-apple-darwin".to_string(),
         "freebsd" => "x86_64-unknown-freebsd".to_string(),
-        _ => "x86_64-unknown-linux-gnu".to_string(), // 默认是 Linux
+        _ => "x86_64-unknown-linux-gnu".to_string(), 
     };
+
+    let outfile_name= match os {
+        "windows" => "out.exe".to_string(),
+        "linux" => "a.out".to_string(),
+        _ => "a.out".to_string(),
+    };
+    
     let src_info = SrcInfo{
         target_triple: tt
     };
 
+
+    
     let input_file = &cli.input;
-    let output_file = cli.output.unwrap_or_else(|| "a.out".to_string());
+    let output_file = cli.output.unwrap_or_else(|| outfile_name);
 
     let content = read_fs(input_file);
     let input = content.as_str();
@@ -82,7 +93,7 @@ fn main() {
     if cli.show_tokens{
         println!("{:?}", tokens);
     }
-    
+    println!("{:?}", tokens);
     let mut parser = Parser::new(tokens.clone());
     let mut codegen = Codegen::new();
 

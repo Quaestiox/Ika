@@ -102,6 +102,7 @@ impl Codegen {
         
         let tt =info.target_triple;
         self.output.push_str(&format!("target triple = \"{tt}\"\n"));
+        
 
         self.output.push_str(&generate_lib());
         self.add_to_symbol(1, "echo".to_string(), Info::Function { tmp_name: "echo".to_string(), ret_ty: "i32".to_string(), paras:Vec::from(["i8*".to_string(),"i32".to_string()]), scope: 1 });
