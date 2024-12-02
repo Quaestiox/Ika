@@ -92,7 +92,8 @@ impl Codegen {
         self.sym_table.push(HashMap::new());
         self.sym_table.push(HashMap::new());
         self.sym_table.push(HashMap::new());
-     
+        self.sym_table.push(HashMap::new());
+        self.sym_table.push(HashMap::new());
 
         self.generate_program(ast, info);
         &self.output 
@@ -103,10 +104,13 @@ impl Codegen {
         let tt =info.target_triple;
         self.output.push_str(&format!("target triple = \"{tt}\"\n"));
         
-
-        self.output.push_str(&generate_lib());
+        let v = &generate_lib();
+        for i in v{
+            self.output.push_str(i);
+        }
+        
         self.add_to_symbol(1, "echo".to_string(), Info::Function { tmp_name: "echo".to_string(), ret_ty: "i32".to_string(), paras:Vec::from(["i8*".to_string(),"i32".to_string()]), scope: 1 });
-
+        self.add_to_symbol(1, "string".to_string(), Info::Function { tmp_name: "string".to_string(), ret_ty: "i8*".to_string(), paras:Vec::from(["i32*".to_string()]), scope: 1 });
       
         if let ASTNode::Program(vec) = ast{
             for stat in vec{
@@ -229,7 +233,9 @@ impl Codegen {
                         self.output.push_str(format!("\t%{tmp_res} = mul i32 %{tmp_left}, %{tmp_right}\n").as_str());
                     }else if op == "/"{
                         self.output.push_str(format!("\t%{tmp_res} = udiv i32 %{tmp_left}, %{tmp_right}\n").as_str());
-                    }else{
+                    }else if op == "=="{
+                        self.output.push_str(format!("\t%{tmp_res} = icmp eq i32 %{tmp_left}, %{tmp_right}\n").as_str());
+                    } else{
 
                     }
 
@@ -455,8 +461,8 @@ impl Codegen {
        
 
         self.output.push_str(&format!(")\n"));
-        self.output.push_str(&format!("\t%{tmp2} = alloca i32 \n"));
-        self.output.push_str(&format!("\tstore i32 %{tmp}, ptr %{tmp2} \n"));
+        self.output.push_str(&format!("\t%{tmp2} = alloca {ret_type} \n"));
+        self.output.push_str(&format!("\tstore {ret_type} %{tmp},ptr %{tmp2} \n"));
         format!("%{tmp2}")
     
 
@@ -470,6 +476,7 @@ fn turn_to_llvm_type(ty: String) -> Result<String, String> {
     match ty.as_str() {
         "i32" => Ok("i32".to_string()),
         "str" => Ok("i8*".to_string()),
+        "ptr" => Ok("ptr".to_string()),
         "void" => Ok("void".to_string()),
         _ => Err(format!("Cannot turn type '{}' to LLVM type", ty)),
     }

@@ -4,14 +4,14 @@ use lazy_static::lazy_static;
 use std::sync::{Arc, Mutex};
 use crate::parser::{ASTNode};
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct SymbolTable{
     variables: HashMap<String, String>,
     functions: HashMap<String, Function>,
 }
 
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct Function {
     pub fn_name: String,
     pub paras: Vec<(String, String)>,
@@ -85,6 +85,8 @@ impl ScopeManager{
         self.stack.last().unwrap()
     }
 
+    
+
     pub fn global_scope(&self) -> &SymbolTable {
         self.stack.first().unwrap()
     }
@@ -113,6 +115,11 @@ pub fn lib_insert_symbol(){
         paras: Vec::from([("str".to_string(), "string".to_string()),( "i32".to_string(), "len".to_string())]),
         ret_type: None,
     });
+    SYMBOL_TABLES.lock().unwrap().global_scope_mut().add_function("string".to_string(),  Function {
+        fn_name: "string".to_string(),
+        paras: Vec::from([( "i32*".to_string(), "num".to_string())]),
+        ret_type: None,
+    });
 }
 
 pub fn get_var(name: String)->String{
@@ -120,6 +127,36 @@ pub fn get_var(name: String)->String{
     let info = sym.global_scope().lookup_variable(name.as_str()).unwrap().clone();
     info
 }
+
+pub fn current_index()->usize{
+    let sym = SYMBOL_TABLES.lock().unwrap();
+    sym.stack.len()-1
+    
+}
+
+pub fn insert_var(name:String, var_type:String){
+    
+    let mut sym = SYMBOL_TABLES.lock().unwrap();
+    sym.current_scope_mut().add_variable(name.clone(), var_type.clone());
+}
+
+pub fn has_var(name: String, scope:&mut usize) -> bool{
+    let sym = SYMBOL_TABLES.lock().unwrap();
+    loop {
+        let st = sym.stack[*scope].clone();
+        let b = st.has_variable(name.as_str());
+        if b{
+            return true;
+        }else if *scope == 0{
+            break;
+        }else {
+            *scope -= 1;
+        }
+        
+    }
+    false
+}
+
 
 pub fn get_fun(name: String)->Function{
     let sym = SYMBOL_TABLES.lock().unwrap();

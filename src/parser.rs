@@ -1,4 +1,4 @@
-use crate::{lexer::{tokenization, Error, Token, TokenType, LEXER}, sema::{get_fun, get_var}};
+use crate::{lexer::{tokenization, Error, Token, TokenType, LEXER}, sema::{current_index, get_fun, get_var, has_var, insert_var}};
 use std::collections::HashMap;
 use crate::sema::{SYMBOL_TABLES,Function};
 
@@ -220,8 +220,9 @@ impl Parser {
 
     fn parse_variable_definition(&mut self) -> Result<ASTNode, String>{
         let var_type = handle_type(self.advance().unwrap().value.as_str())?;
-        let identifier = handle_identifier(self.advance().unwrap().value.as_str())?;
-        if SYMBOL_TABLES.lock().unwrap().current_scope().has_variable(identifier.as_str()) {
+        let identifier = handle_identifier(self.advance().unwrap().value.as_str())?;     
+        let index = has_var(identifier.clone(), &mut current_index());
+        if index {
             return Err(format!("Variable '{}' is already defined", identifier));
         } 
         let var_value = if self.peek().unwrap().token_type == TokenType::EQUALS{
@@ -231,7 +232,7 @@ impl Parser {
             None
         };
         self.expect(TokenType::SEMICOLON, String::from(";"))?;
-        SYMBOL_TABLES.lock().unwrap().current_scope_mut().add_variable(identifier.clone(), var_type.clone());
+        insert_var(identifier.clone(), var_type.clone());
         Ok(ASTNode::VariableDefinition{ 
             var_type, 
             identifier, 
@@ -240,7 +241,8 @@ impl Parser {
     }
 
     fn parse_assignment(&mut self, var_name:String) ->Result<ASTNode, String>{
-        if !SYMBOL_TABLES.lock().unwrap().current_scope().has_variable(var_name.as_str()){
+        let index = &mut current_index();
+        if !has_var(var_name.clone(), index){
             return Err(format!("No variable {var_name}"));
         }
         self.expect(TokenType::EQUALS, String::from("="))?;
