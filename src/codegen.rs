@@ -339,6 +339,7 @@ impl Codegen {
         }
 
         self.output.push_str(") {\n");
+        self.output.push_str("entry:\n");
         self.output.push_str(&gen);
         
         self.tmp += 1;

@@ -110,17 +110,34 @@ fn main() {
             let out = codegen.generate_code(ast, src_info).clone();
            
 
-            std::fs::write("output.ll", out).expect("Unable to write file");
+            std::fs::write(".\\target\\output.ll", out).expect("Unable to write file");
 
-            let compile_status = Command::new("clang")
+            let compile_status = Command::new("llvm-link")
+                .arg(".\\lib\\base.ll")
+                .arg(".\\lib\\lib_for_linux.ll") 
+                .arg(".\\lib\\lib_for_windows.ll")
+                .arg(".\\target\\output.ll")
+                .arg("-o")
+                .arg(".\\target\\linked.ll")
+                .status()
+                .expect("Failed to run llvm-link");
+
+            if compile_status.success() {
+                println!("Link successful.");         
+            } else {
+                eprintln!("link error.");
+                exit(1);
+            }
+
+            let compile_status2 = Command::new("clang")
                 .arg("-Wno-override-module")
                 .arg("-o") 
                 .arg(&output_file)
-                .arg("output.ll")
+                .arg(".\\target\\linked.ll")
                 .status()
                 .expect("Failed to run clang");
 
-            if compile_status.success() {
+            if compile_status2.success() {
                 println!("Compilation successful. Executable: {}", output_file);         
             } else {
                 eprintln!("Error during compilation.");
