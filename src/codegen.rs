@@ -144,6 +144,8 @@ impl Codegen {
 
             ASTNode::IfElse { condition, if_body, elif_body, el_condition, else_body 
             } => self.generate_code_ifelse(condition, if_body, elif_body,el_condition, else_body),
+
+            ASTNode::While { condition, body } => self.generate_code_while( condition, body),
             
             ASTNode::FunctionCall { fn_name, argument } => {self.generate_code_funcall(fn_name, argument);()},
             _ => ()
@@ -244,7 +246,19 @@ impl Codegen {
                     }else if op == "=="{
                         self.output.push_str(format!("\t%{tmp_res} = icmp eq i32 %{tmp_left}, %{tmp_right}\n").as_str());
                         ty = "i1".to_string();
-                    } else{
+                    } else if op == ">="{
+                        self.output.push_str(format!("\t%{tmp_res} = icmp sge i32 %{tmp_left}, %{tmp_right}\n").as_str());
+                        ty = "i1".to_string();
+                    }else if op == "<="{
+                        self.output.push_str(format!("\t%{tmp_res} = icmp sle i32 %{tmp_left}, %{tmp_right}\n").as_str());
+                        ty = "i1".to_string();
+                    }else if op == ">"{
+                        self.output.push_str(format!("\t%{tmp_res} = icmp sgt i32 %{tmp_left}, %{tmp_right}\n").as_str());
+                        ty = "i1".to_string();
+                    }else if op == "<"{
+                        self.output.push_str(format!("\t%{tmp_res} = icmp slt i32 %{tmp_left}, %{tmp_right}\n").as_str());
+                        ty = "i1".to_string();
+                    }else{
 
                     }
 
@@ -400,12 +414,12 @@ impl Codegen {
             let ty = var.1;
             let var_name = var.0;
             self.output.push_str(format!("\t%{tmp} = load {ty}, ptr {value}\n").as_str());
-            self.output.push_str(format!("\tstore {ty} {tmp}, ptr {var_name}\n").as_str());
+            self.output.push_str(format!("\tstore {ty} %{tmp}, ptr {var_name}\n").as_str());
         }else{
             let ty = var.1;
             let var_name = var.0;
             self.output.push_str(format!("\t%{tmp} = load {ty}, ptr {value}\n").as_str());
-            self.output.push_str(format!("\tstore {ty} {tmp}, ptr {var_name}\n").as_str());
+            self.output.push_str(format!("\tstore {ty} %{tmp}, ptr {var_name}\n").as_str());
         }
         
     }
@@ -507,7 +521,7 @@ impl Codegen {
 
       
 
-        let mut prev_tmp2 = tmp2.clone();
+        
         for (i, elif_cond) in el_condition.iter().enumerate() {
             
             self.output.push_str(format!("__{tmp4}:\n").as_str()); 
@@ -531,7 +545,7 @@ impl Codegen {
             }
             self.output.push_str(format!("\tbr label %__{tmp3}\n").as_str());
 
-            prev_tmp2 = self.new_tmp();
+            
         }
 
         match else_body{
@@ -551,6 +565,29 @@ impl Codegen {
 
 
     }
+
+    fn generate_code_while(&mut self,  condition:Box<ASTNode>, body:Vec<ASTNode>){
+        let tmp1 = self.new_tmp(); // bool
+        let tmp2 = self.new_tmp(); // true
+        let tmp3 = self.new_tmp(); // false
+        self.output.push_str(format!("\tbr label %__{tmp1}\n").as_str());
+        self.output.push_str(format!("__{tmp1}:\n").as_str());
+        let res = self.generate_code_expression(*condition);
+        let tmp = self.new_tmp();
+        self.output.push_str(format!("\t%{tmp} = load i1, ptr {res}\n").as_str());
+        self.output.push_str(format!("\tbr i1 %{tmp}, label %__{tmp2}, label %__{tmp3}\n").as_str());
+        self.output.push_str(format!("__{tmp2}:\n").as_str());
+        for stat in body{
+            self.generate_statement(stat);
+        }
+        self.output.push_str(format!("\tbr label %__{tmp1}\n").as_str());
+
+        self.output.push_str(format!("__{tmp3}:\n").as_str());
+
+
+
+    }
+
 }
 
 
@@ -560,6 +597,7 @@ fn turn_to_llvm_type(ty: String) -> Result<String, String> {
         "str" => Ok("i8*".to_string()),
         "ptr" => Ok("ptr".to_string()),
         "void" => Ok("void".to_string()),
+        "i1" => Ok("i1".to_string()),
         _ => Err(format!("Cannot turn type '{}' to LLVM type", ty)),
     }
 }

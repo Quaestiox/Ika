@@ -1,6 +1,6 @@
 
 sub main(){
-    i32 a = 3;
+    i32 a = 1;
     if a == 1{
         echo("aaa", 3);
     }elif a == 3{
@@ -10,4 +10,9 @@ sub main(){
         echo("ccc",3);
     }
     echo("xxxx", 4);
+
+    while a < 5{
+        echo("hi", 2);
+        a = a + 1;
+    }
 }

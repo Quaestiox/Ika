@@ -268,7 +268,7 @@ impl Parser {
                     } 
                     self.parse_function_call(token.value)
                 } else {
-                    if !SYMBOL_TABLES.lock().unwrap().current_scope().has_variable(&token.value){
+                    if !has_var(token.value.clone(), &mut current_index()){
                         return Err(format!("No such variable {}", &token.value));
                     }
                     Ok(ASTNode::Identifier(token.value.clone()))
@@ -324,7 +324,6 @@ impl Parser {
         }
         Ok(primary)
     }
-
     
     fn parse_expression_third(&mut self) -> Result<ASTNode, String>{
         let mut primary = self.parse_expression_secondary()?;
@@ -449,7 +448,7 @@ impl Parser {
         while self.peek().unwrap().token_type != TokenType::RBRACE{
             statements.push(self.parse_statement()?);
         }
-        self.expect(TokenType::RBRACE, String::from("}"));
+        self.expect(TokenType::RBRACE, String::from("}"))?;
         SYMBOL_TABLES.lock().unwrap().pop_scope();
         Ok(statements)
     }
