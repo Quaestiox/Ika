@@ -33,7 +33,8 @@ pub enum ASTNode {
     IfElse{
         condition: Box<ASTNode>,
         if_body: Vec<ASTNode>,
-        elif_body:  Option<Vec<ASTNode>>,
+        elif_body:  Vec<Vec<ASTNode>>,
+        el_condition: Vec<ASTNode>,
         else_body: Option<Vec<ASTNode>>,
     },
     While{
@@ -395,15 +396,19 @@ impl Parser {
         let if_body = self.parse_block()?;                    
     
         let mut else_body = None;
-        let mut elif_body = None;
+        let mut elif_body = Vec::new();
+        let mut el_condition = Vec::new();
         loop{
             if self.peek().unwrap().token_type == TokenType::KEYWORD && self.peek().unwrap().value == "elif" {
                 self.advance().unwrap(); 
+                el_condition.push(self.parse_expression()?);
+               
                 if self.peek().unwrap().token_type == TokenType::LBRACE {
-                    elif_body = Some(self.parse_block()?); 
+                    elif_body.push(self.parse_block()?); 
                 } else {
                     return Err(format!("Expected block after 'elif'"));
                 }
+            
                 if self.peek().unwrap().token_type == TokenType::KEYWORD 
                     && (self.peek().unwrap().value == "else"
                     || self.peek().unwrap().value == "elif"){
@@ -429,6 +434,7 @@ impl Parser {
             condition: Box::new(condition),
             if_body,
             elif_body,
+            el_condition,
             else_body,
         })
 

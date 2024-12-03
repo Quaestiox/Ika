@@ -1,10 +1,13 @@
 
 sub main(){
-    i32 a = 2;
+    i32 a = 3;
     if a == 1{
         echo("aaa", 3);
-    }else {
+    }elif a == 3{
+        echo("bbbb",4);
+    }
+    else {
         echo("ccc",3);
     }
-    echo("bbbb", 4);
+    echo("xxxx", 4);
 }

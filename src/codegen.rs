@@ -142,8 +142,8 @@ impl Codegen {
 
             ASTNode::Return(ast) => self.generate_code_return(*ast),
 
-            ASTNode::IfElse { condition, if_body, elif_body, else_body 
-            } => self.generate_code_ifelse(condition, if_body, elif_body, else_body),
+            ASTNode::IfElse { condition, if_body, elif_body, el_condition, else_body 
+            } => self.generate_code_ifelse(condition, if_body, elif_body,el_condition, else_body),
             
             ASTNode::FunctionCall { fn_name, argument } => {self.generate_code_funcall(fn_name, argument);()},
             _ => ()
@@ -477,24 +477,26 @@ impl Codegen {
 
     } 
 
-    fn generate_code_ifelse(&mut self,condition:Box<ASTNode>, if_body:Vec<ASTNode>, elif_body:Option<Vec<ASTNode>>, else_body:Option<Vec<ASTNode>>) {
+    fn generate_code_ifelse(&mut self,condition:Box<ASTNode>, if_body:Vec<ASTNode>, elif_body:Vec<Vec<ASTNode>>, el_condition: Vec<ASTNode>,else_body:Option<Vec<ASTNode>>) {
         let res = self.generate_code_expression(*condition);
         let mut jmp = 0;
         
         let tmp = self.new_tmp();
         let tmp1 = self.new_tmp(); // if
         let mut tmp2 = 0;// else
+        let mut tmp4 = 0; //elif
         let tmp3 = self.new_tmp(); // final
-        if else_body.is_some(){
+        if elif_body.len() > 0{
             tmp2 = self.new_tmp(); 
+            tmp4 = self.new_tmp();
+            jmp = tmp4;
+        } else if else_body.is_some(){
+            tmp2 = self.new_tmp();
             jmp = tmp2;
-        } else{
+        } else {
             jmp = tmp3;
         }
         
-        
-       
-      
         self.output.push_str(format!("\t%{tmp} = load i1, ptr {res}\n").as_str());
         self.output.push_str(format!("\tbr i1 %{tmp}, label %__{tmp1}, label %__{jmp}\n").as_str());
         self.output.push_str(format!("__{tmp1}:\n").as_str());
@@ -502,13 +504,39 @@ impl Codegen {
             self.generate_statement(stat);
         }
         self.output.push_str(format!("\tbr label %__{tmp3}\n").as_str());
-        if else_body.is_some(){
-            self.output.push_str(format!("__{tmp2}:\n").as_str());
+
+      
+
+        let mut prev_tmp2 = tmp2.clone();
+        for (i, elif_cond) in el_condition.iter().enumerate() {
+            
+            self.output.push_str(format!("__{tmp4}:\n").as_str()); 
+            let cond = self.generate_code_expression(elif_cond.clone());
+            let tmp_el0 = self.new_tmp(); //elif bool
+            let tmp_el1 = self.new_tmp(); // elif body
+            let mut tmp_el2 = self.new_tmp(); // elif jmp
+            if i < el_condition.len()-1{
+                tmp4 = self.new_tmp();
+                tmp_el2 = tmp4;
+                
+            }else{
+                tmp_el2 = tmp2;
+            }
+            self.output.push_str(format!("\t%{tmp_el0} = load i1, ptr {cond}\n").as_str()); 
+            self.output.push_str(format!("\tbr i1 %{tmp_el0}, label %__{tmp_el1}, label %__{tmp_el2}\n").as_str());
+
+            self.output.push_str(format!("__{tmp_el1}:\n").as_str());
+            for stat in elif_body[i].clone() {
+                self.generate_statement(stat);
+            }
+            self.output.push_str(format!("\tbr label %__{tmp3}\n").as_str());
+
+            prev_tmp2 = self.new_tmp();
         }
-        
 
         match else_body{
             Some(v) =>{
+                self.output.push_str(format!("__{tmp2}:\n").as_str());
                 for stat in v{
                     self.generate_statement(stat);
                 }
