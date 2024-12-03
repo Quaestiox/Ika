@@ -141,6 +141,9 @@ impl Codegen {
             } => self.generate_code_fundef(fn_name, parameters, ret_type, body),
 
             ASTNode::Return(ast) => self.generate_code_return(*ast),
+
+            ASTNode::IfElse { condition, if_body, elif_body, else_body 
+            } => self.generate_code_ifelse(condition, if_body, elif_body, else_body),
             
             ASTNode::FunctionCall { fn_name, argument } => {self.generate_code_funcall(fn_name, argument);()},
             _ => ()
@@ -225,24 +228,30 @@ impl Codegen {
 
                     let tmp_res = self.tmp;
                     self.tmp += 1;
+                    let mut ty = String::new();
                     if op == "+"{
                         self.output.push_str(format!("\t%{tmp_res} = add i32 %{tmp_left}, %{tmp_right}\n").as_str());
+                        ty = "i32".to_string();
                     } else if op == "-"{
                         self.output.push_str(format!("\t%{tmp_res} = sub i32 %{tmp_left}, %{tmp_right}\n").as_str());
+                        ty = "i32".to_string();
                     }else if op == "*"{
                         self.output.push_str(format!("\t%{tmp_res} = mul i32 %{tmp_left}, %{tmp_right}\n").as_str());
+                        ty = "i32".to_string();
                     }else if op == "/"{
                         self.output.push_str(format!("\t%{tmp_res} = udiv i32 %{tmp_left}, %{tmp_right}\n").as_str());
+                        ty = "i32".to_string();
                     }else if op == "=="{
                         self.output.push_str(format!("\t%{tmp_res} = icmp eq i32 %{tmp_left}, %{tmp_right}\n").as_str());
+                        ty = "i1".to_string();
                     } else{
 
                     }
 
                     let tmp_new = self.tmp;
                     self.tmp += 1;
-                    self.output.push_str(format!("\t%{tmp_new} = alloca i32\n").as_str());
-                    self.output.push_str(format!("\tstore i32 %{tmp_res}, ptr %{tmp_new}\n").as_str());
+                    self.output.push_str(format!("\t%{tmp_new} = alloca {ty}\n").as_str());
+                    self.output.push_str(format!("\tstore {ty} %{tmp_res}, ptr %{tmp_new}\n").as_str());
                     format!("%{tmp_new}")
                 } else{
                     let tmp_new = if op == "+"{
@@ -385,14 +394,18 @@ impl Codegen {
     fn generate_code_assignment(&mut self,  identifier: String, var_value: Option<Box<ASTNode>>,){  
         let var = self.get_varinfo(identifier).unwrap();
         let value = self.generate_code_expression(*var_value.unwrap());
+        let tmp =self.new_tmp();
+       
         if var.2 != 1{
             let ty = var.1;
             let var_name = var.0;
-            self.output.push_str(format!("\tstore {ty} {value}, ptr {var_name}\n").as_str());
+            self.output.push_str(format!("\t%{tmp} = load {ty}, ptr {value}\n").as_str());
+            self.output.push_str(format!("\tstore {ty} {tmp}, ptr {var_name}\n").as_str());
         }else{
             let ty = var.1;
             let var_name = var.0;
-            self.output.push_str(format!("\tstore {ty} {value}, ptr {var_name}\n").as_str());
+            self.output.push_str(format!("\t%{tmp} = load {ty}, ptr {value}\n").as_str());
+            self.output.push_str(format!("\tstore {ty} {tmp}, ptr {var_name}\n").as_str());
         }
         
     }
@@ -417,10 +430,7 @@ impl Codegen {
                 values.push(format!("%{ptmp}"));
             } else{
                 values.push(format!("{v}"));
-            }
-           
-
-        
+            }      
         }
 
         if ret_type == "void".to_string(){
@@ -459,16 +469,44 @@ impl Codegen {
             let tmp2 = self.tmp;
         self.tmp += 1;
        
-
         self.output.push_str(&format!(")\n"));
         self.output.push_str(&format!("\t%{tmp2} = alloca {ret_type} \n"));
         self.output.push_str(&format!("\tstore {ret_type} %{tmp},ptr %{tmp2} \n"));
         format!("%{tmp2}")
-    
-
         }
 
     } 
+
+    fn generate_code_ifelse(&mut self,condition:Box<ASTNode>, if_body:Vec<ASTNode>, elif_body:Option<Vec<ASTNode>>, else_body:Option<Vec<ASTNode>>) {
+        let res = self.generate_code_expression(*condition);
+        let tmp = self.new_tmp();
+        let tmp1 = self.new_tmp();
+        let tmp2 = self.new_tmp();
+        let tmp3 = self.new_tmp();
+      
+        self.output.push_str(format!("\t%{tmp} = load i1, ptr {res}\n").as_str());
+        self.output.push_str(format!("\tbr i1 %{tmp}, label %__{tmp1}, label %__{tmp2}\n").as_str());
+        self.output.push_str(format!("__{tmp1}:\n").as_str());
+        for stat in if_body{
+            self.generate_statement(stat);
+        }
+        self.output.push_str(format!("\tbr label %__{tmp3}\n").as_str());
+        self.output.push_str(format!("__{tmp2}:\n").as_str());
+        match else_body{
+            Some(v) =>{
+                for stat in v{
+                    self.generate_statement(stat);
+                }
+            }
+            None => (),
+        }
+        self.output.push_str(format!("\tbr label %__{tmp3}\n").as_str());
+        self.output.push_str(format!("__{tmp3}:\n").as_str());
+
+
+
+
+    }
 }
 
 

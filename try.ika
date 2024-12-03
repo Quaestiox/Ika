@@ -1,17 +1,11 @@
-str h1 = "Hello, ";
+
 sub main(){
-    i32 a = 5;
-    i32 b = 4;
+    i32 a = 2;
     if a == 1{
-        b = 3;
-    } elif {
-        b = 5;
+        echo("aaa", 3);
     }else {
-        b = 4;
-    }
-    
-    while a == b{
-        i32 c = 2;
-    }
+        echo("bbbb", 4);
+    } 
+  
    
 }
