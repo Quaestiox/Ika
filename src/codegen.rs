@@ -479,28 +479,44 @@ impl Codegen {
 
     fn generate_code_ifelse(&mut self,condition:Box<ASTNode>, if_body:Vec<ASTNode>, elif_body:Option<Vec<ASTNode>>, else_body:Option<Vec<ASTNode>>) {
         let res = self.generate_code_expression(*condition);
+        let mut jmp = 0;
+        
         let tmp = self.new_tmp();
-        let tmp1 = self.new_tmp();
-        let tmp2 = self.new_tmp();
-        let tmp3 = self.new_tmp();
+        let tmp1 = self.new_tmp(); // if
+        let mut tmp2 = 0;// else
+        let tmp3 = self.new_tmp(); // final
+        if else_body.is_some(){
+            tmp2 = self.new_tmp(); 
+            jmp = tmp2;
+        } else{
+            jmp = tmp3;
+        }
+        
+        
+       
       
         self.output.push_str(format!("\t%{tmp} = load i1, ptr {res}\n").as_str());
-        self.output.push_str(format!("\tbr i1 %{tmp}, label %__{tmp1}, label %__{tmp2}\n").as_str());
+        self.output.push_str(format!("\tbr i1 %{tmp}, label %__{tmp1}, label %__{jmp}\n").as_str());
         self.output.push_str(format!("__{tmp1}:\n").as_str());
         for stat in if_body{
             self.generate_statement(stat);
         }
         self.output.push_str(format!("\tbr label %__{tmp3}\n").as_str());
-        self.output.push_str(format!("__{tmp2}:\n").as_str());
+        if else_body.is_some(){
+            self.output.push_str(format!("__{tmp2}:\n").as_str());
+        }
+        
+
         match else_body{
             Some(v) =>{
                 for stat in v{
                     self.generate_statement(stat);
                 }
+                self.output.push_str(format!("\tbr label %__{tmp3}\n").as_str());
             }
             None => (),
         }
-        self.output.push_str(format!("\tbr label %__{tmp3}\n").as_str());
+       
         self.output.push_str(format!("__{tmp3}:\n").as_str());
 
 

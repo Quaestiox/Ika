@@ -418,6 +418,8 @@ impl Parser {
                     return Err(format!("Expected block after 'else'"));
                 }
                 break;
+            } else{
+                break;
             }
 
         }

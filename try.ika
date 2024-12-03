@@ -4,8 +4,7 @@ sub main(){
     if a == 1{
         echo("aaa", 3);
     }else {
-        echo("bbbb", 4);
-    } 
-  
-   
+        echo("ccc",3);
+    }
+    echo("bbbb", 4);
 }
