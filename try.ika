@@ -1,18 +1,17 @@
+i32 global_i = 100;
+str global_str = "Hello, ";
 
 sub main(){
-    i32 a = 1;
-    if a == 1{
-        echo("aaa", 3);
-    }elif a == 3{
-        echo("bbbb",4);
-    }
-    else {
-        echo("ccc",3);
-    }
-    echo("xxxx", 4);
+ 
+    str string = "Hello";
+    echo(string, 5);
 
-    while a < 5{
-        echo("hi", 2);
-        a = a + 1;
-    }
+    string = "world";
+    echo(string, 5);
+
+string = "lcdl";
+    echo(string, 5);
+
+
+ 
 }

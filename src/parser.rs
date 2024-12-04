@@ -1,5 +1,5 @@
-use crate::{lexer::{tokenization, Error, Token, TokenType, LEXER}, sema::{current_index, get_fun, get_var, has_var, insert_var}};
-use std::collections::HashMap;
+use crate::{lexer::{tokenization, Error, Token, TokenType, LEXER}, sema::{current_index, get_fun, get_var, has_var, insert_var,get_ty}};
+use std::{collections::HashMap, fmt::format};
 use crate::sema::{SYMBOL_TABLES,Function};
 
 #[derive(Debug, Clone,PartialEq)]
@@ -118,17 +118,21 @@ impl Parser {
                         
                         let res = self.parse_function_call(token.value.clone());
                         if res.is_err(){
-                            res
+                            Ok(res?.0)
                         }else{
                             self.expect(TokenType::SEMICOLON, String::from(";"))?;
-                            res
+                            Ok(res?.0)
                         }
-                        
+                
                     }
                     _ => Err(format!("Invalid symbol {:?}",cur))
                 }
             }
-            _ => self.parse_expression()
+            _ => {
+                let ex = self.parse_expression();
+                Ok(ex?.0)
+
+            }
 
         }
     }
@@ -177,12 +181,13 @@ impl Parser {
     fn parse_return(&mut self) -> Result<ASTNode, String>{
         self.expect(TokenType::KEYWORD, String::from("ret"))?;
         let value = self.parse_expression()?;
+        
         self.expect(TokenType::SEMICOLON, String::from(";"))?;
-        Ok(ASTNode::Return(Box::new(value)))
+        Ok(ASTNode::Return(Box::new(value.0)))
 
     }
 
-    fn parse_function_call(&mut self, fn_name:String ) -> Result<ASTNode, String>{
+    fn parse_function_call(&mut self, fn_name:String ) -> Result<(ASTNode, String), String>{
         self.expect(TokenType::LPAREN, String::from("("))?;
         let mut args = Vec::new();
       
@@ -198,7 +203,7 @@ impl Parser {
         }
         
         while self.peek().unwrap().token_type != TokenType::RPAREN{
-            let arg = self.parse_expression()?;
+            let arg = self.parse_expression()?.0;
             
             args.push(arg);
 
@@ -214,24 +219,45 @@ impl Parser {
         }
 
         self.expect(TokenType::RPAREN, String::from(")"))?;
+
+        let ret_ty = match info.ret_type{
+            Some(a) => a,
+            None => "void".to_string(),
+        };
        
 
-        Ok(ASTNode::FunctionCall { fn_name: fn_name, argument: args })
+        Ok((ASTNode::FunctionCall { fn_name: fn_name, argument: args }, ret_ty))
     }
 
     fn parse_variable_definition(&mut self) -> Result<ASTNode, String>{
         let var_type = handle_type(self.advance().unwrap().value.as_str())?;
         let identifier = handle_identifier(self.advance().unwrap().value.as_str())?;     
         let index = has_var(identifier.clone(), &mut current_index());
+
+        let mut ty = String::new();
+        let mut var_value = None;
+
         if index {
             return Err(format!("Variable '{}' is already defined", identifier));
         } 
-        let var_value = if self.peek().unwrap().token_type == TokenType::EQUALS{
+        let var_info = if self.peek().unwrap().token_type == TokenType::EQUALS{
             self.advance();
-            Some(Box::new(self.parse_expression()?))
+            Some(Box::new(self.parse_expression()?))           
         } else{
             None
         };
+        match var_info{
+            Some(i ) => {
+                let mut ty = i.1;
+                if var_type != ty{
+                    return Err(format!("cannot assign {} type to {} type", ty, var_type));
+                } else{
+                    var_value = Some(Box::new(i.0));
+                }
+            }
+            None =>()
+        }
+
         self.expect(TokenType::SEMICOLON, String::from(";"))?;
         insert_var(identifier.clone(), var_type.clone());
         Ok(ASTNode::VariableDefinition{ 
@@ -247,7 +273,7 @@ impl Parser {
             return Err(format!("No variable {var_name}"));
         }
         self.expect(TokenType::EQUALS, String::from("="))?;
-        let var_value = Some(Box::new(self.parse_expression()?));
+        let var_value = Some(Box::new(self.parse_expression()?.0));
         self.expect(TokenType::SEMICOLON, String::from(";"))?;
         Ok(ASTNode::Assignment {    
             identifier: var_name, 
@@ -255,11 +281,11 @@ impl Parser {
         })
     }
 
-    fn parse_expression_primary(&mut self) -> Result<ASTNode, String>{
+    fn parse_expression_primary(&mut self) -> Result<(ASTNode, String), String>{
         let token = self.advance().unwrap().clone();
         match token.token_type {
-            TokenType::NUMBER => Ok(ASTNode::Number(token.value.clone())),
-            TokenType::STRING => Ok(ASTNode::String(token.value.clone())),
+            TokenType::NUMBER => Ok((ASTNode::Number(token.value.clone()), "i32".to_string())),
+            TokenType::STRING => Ok((ASTNode::String(token.value.clone()), "str".to_string())),
             TokenType::ID => {
                 
                 if self.peek().unwrap().token_type == TokenType::LPAREN{
@@ -271,7 +297,8 @@ impl Parser {
                     if !has_var(token.value.clone(), &mut current_index()){
                         return Err(format!("No such variable {}", &token.value));
                     }
-                    Ok(ASTNode::Identifier(token.value.clone()))
+                    let ty = get_ty(token.value.clone(), &mut current_index());
+                    Ok((ASTNode::Identifier(token.value.clone()), ty))
                 }
             }
             TokenType::AT => {
@@ -287,7 +314,8 @@ impl Parser {
                         if !SYMBOL_TABLES.lock().unwrap().stack[0].has_variable(&token.value){
                             return Err(format!("No such variable {}", &token.value));
                         }
-                        Ok(ASTNode::Identifier(token.value.clone()))
+                        let ty = get_ty(token.value.clone(), &mut current_index());
+                        Ok((ASTNode::Identifier(token.value.clone()), ty))
                     }
 
                 }else {
@@ -306,17 +334,19 @@ impl Parser {
         }
     }
 
-    fn parse_expression_secondary(&mut self) -> Result<ASTNode, String>{
+    fn parse_expression_secondary(&mut self) -> Result<(ASTNode,String), String>{
         let mut primary = self.parse_expression_primary()?;
 
         while let Ok(token) = self.peek(){
-            if token.token_type == TokenType::ASTERISK || token.token_type == TokenType::SLASH{
+            if token.token_type == TokenType::ASTERISK 
+                || token.token_type == TokenType::SLASH 
+                || token.token_type == TokenType::REM {
                 let op = self.advance().unwrap().value.clone();
                 let right_expr = self.parse_expression_primary()?;
-                primary = ASTNode::InfixExpression {
-                    left_expr:Box::new(primary),
+                primary.0 = ASTNode::InfixExpression {
+                    left_expr:Box::new(primary.0),
                     op,
-                    right_expr:Box::new(right_expr),
+                    right_expr:Box::new(right_expr.0),
                 }
             } else{
                 break;
@@ -325,7 +355,7 @@ impl Parser {
         Ok(primary)
     }
     
-    fn parse_expression_third(&mut self) -> Result<ASTNode, String>{
+    fn parse_expression_third(&mut self) -> Result<(ASTNode, String), String>{
         let mut primary = self.parse_expression_secondary()?;
 
         while let Ok(token) = self.peek(){
@@ -338,10 +368,10 @@ impl Parser {
             {
                 let op = self.advance().unwrap().value.clone();
                 let right_expr = self.parse_expression_secondary()?;
-                primary = ASTNode::InfixExpression {
-                    left_expr:Box::new(primary),
+                primary.0 = ASTNode::InfixExpression {
+                    left_expr:Box::new(primary.0),
                     op,
-                    right_expr:Box::new(right_expr),
+                    right_expr:Box::new(right_expr.0),
                 }
             } else{
                 break;
@@ -350,24 +380,24 @@ impl Parser {
         Ok(primary)
     }
 
-    fn parse_expression(&mut self) -> Result<ASTNode, String>{
+    fn parse_expression(&mut self) -> Result<(ASTNode,String), String>{
         let mut node = self.parse_expression_third()?;
 
         while let Ok(token) = self.peek() {
             if token.token_type == TokenType::ADD || token.token_type == TokenType::MINUS{
                 let op = self.advance().unwrap().value.clone();
                 let right_expr = self.parse_expression_secondary()?;
-                node = ASTNode::InfixExpression {
-                    left_expr:Box::new(node),
+                node.0 = ASTNode::InfixExpression {
+                    left_expr:Box::new(node.0),
                     op,
-                    right_expr:Box::new(right_expr),
-                }
+                    right_expr:Box::new(right_expr.0),
+                };
             } else{
                 break;
             }
         }
 
-        Ok(node)
+        Ok((node.0, node.1))
     }
 
     fn parse_while(&mut self) -> Result<ASTNode, String>{
@@ -380,7 +410,7 @@ impl Parser {
         let body = self.parse_block()?;                         
     
         Ok(ASTNode::While {
-          condition: Box::new(condition),
+          condition: Box::new(condition.0),
           body,
         })
 
@@ -400,7 +430,7 @@ impl Parser {
         loop{
             if self.peek().unwrap().token_type == TokenType::KEYWORD && self.peek().unwrap().value == "elif" {
                 self.advance().unwrap(); 
-                el_condition.push(self.parse_expression()?);
+                el_condition.push(self.parse_expression()?.0);
                
                 if self.peek().unwrap().token_type == TokenType::LBRACE {
                     elif_body.push(self.parse_block()?); 
@@ -430,10 +460,10 @@ impl Parser {
         
     
         Ok(ASTNode::IfElse {
-            condition: Box::new(condition),
+            condition: Box::new(condition.0),
             if_body,
             elif_body,
-            el_condition,
+            el_condition ,
             else_body,
         })
 
@@ -671,25 +701,5 @@ mod tests{
         }
     }
 
-    // #[test]
-    // fn err_already_have_value(){
-    //     SYMBOL_TABLES.lock().unwrap().current_scope_mut().add_variable("test_a".to_string(), "i32".to_string());
-    //     let input = "a = 5;";
-    //     let mut lexer = LEXER::new(input);
-    //     let mut tokens = Vec::new(); 
-    //     tokens = tokenization(&mut lexer).unwrap();
-    //     tokens.push(Token {
-    //         token_type: TokenType::EOF,
-    //         value: String::new(), 
-    //     });
-        
-    
-    //     let mut parser = Parser::new(tokens.clone());
-    //     assert!(parser.parse_program().is_err());
-       
-
-
-    // }
-
-   
+  
 }

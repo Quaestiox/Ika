@@ -115,10 +115,15 @@ pub fn lib_insert_symbol(){
         paras: Vec::from([("str".to_string(), "string".to_string()),( "i32".to_string(), "len".to_string())]),
         ret_type: None,
     });
-    SYMBOL_TABLES.lock().unwrap().global_scope_mut().add_function("string".to_string(),  Function {
-        fn_name: "string".to_string(),
-        paras: Vec::from([( "i32*".to_string(), "num".to_string())]),
-        ret_type: None,
+    SYMBOL_TABLES.lock().unwrap().global_scope_mut().add_function("itos".to_string(),  Function {
+        fn_name: "itos".to_string(),
+        paras: Vec::from([( "i32".to_string(), "num".to_string())]),
+        ret_type: Some("str".to_string()),
+    });
+    SYMBOL_TABLES.lock().unwrap().global_scope_mut().add_function("len".to_string(),  Function {
+        fn_name: "len".to_string(),
+        paras: Vec::from([( "str".to_string(), "string".to_string())]),
+        ret_type: Some("i32".to_string()),
     });
 }
 
@@ -155,6 +160,22 @@ pub fn has_var(name: String, scope:&mut usize) -> bool{
         
     }
     false
+}
+pub fn get_ty(name: String, scope:&mut usize) -> String{
+    let sym = SYMBOL_TABLES.lock().unwrap();
+    loop {
+        let st = sym.stack[*scope].clone();
+        let b = st.has_variable(name.as_str());
+        if b{
+            return sym.stack[*scope].lookup_variable(name.as_str()).unwrap();
+        }else if *scope == 0{
+            break;
+        }else {
+            *scope -= 1;
+        }
+        
+    }
+    "".to_string()
 }
 
 

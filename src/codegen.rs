@@ -110,8 +110,8 @@ impl Codegen {
         }
         
         self.add_to_symbol(1, "echo".to_string(), Info::Function { tmp_name: "echo".to_string(), ret_ty: "i32".to_string(), paras:Vec::from(["i8*".to_string(),"i32".to_string()]), scope: 1 });
-        self.add_to_symbol(1, "string".to_string(), Info::Function { tmp_name: "string".to_string(), ret_ty: "i8*".to_string(), paras:Vec::from(["i32*".to_string()]), scope: 1 });
-      
+        self.add_to_symbol(1, "itos".to_string(), Info::Function { tmp_name: "itos".to_string(), ret_ty: "i8*".to_string(), paras:Vec::from(["i32".to_string()]), scope: 1 });
+        self.add_to_symbol(1, "len".to_string(), Info::Function { tmp_name: "len".to_string(), ret_ty: "i32".to_string(), paras:Vec::from(["i8*".to_string()]), scope: 1 });
         if let ASTNode::Program(vec) = ast{
             for stat in vec{
                 self.generate_statement(stat);
@@ -155,8 +155,6 @@ impl Codegen {
     pub fn generate_code_vardef(&mut self, var_type:String, identifier:String, var_value:Option<Box<ASTNode>>){
         
         let llvm_var_type = turn_to_llvm_type(var_type).unwrap();
-
-        
 
         if self.scope != 1{
             let tmp = self.tmp;
@@ -243,6 +241,9 @@ impl Codegen {
                     }else if op == "/"{
                         self.output.push_str(format!("\t%{tmp_res} = udiv i32 %{tmp_left}, %{tmp_right}\n").as_str());
                         ty = "i32".to_string();
+                    }else if op == "%"{
+                        self.output.push_str(format!("\t%{tmp_res} = srem i32 %{tmp_left}, %{tmp_right}\n").as_str());
+                        ty = "i32".to_string();
                     }else if op == "=="{
                         self.output.push_str(format!("\t%{tmp_res} = icmp eq i32 %{tmp_left}, %{tmp_right}\n").as_str());
                         ty = "i1".to_string();
@@ -257,6 +258,18 @@ impl Codegen {
                         ty = "i1".to_string();
                     }else if op == "<"{
                         self.output.push_str(format!("\t%{tmp_res} = icmp slt i32 %{tmp_left}, %{tmp_right}\n").as_str());
+                        ty = "i1".to_string();
+                    }else if op == "|"{
+                        self.output.push_str(format!("\t%{tmp_res} = or i1 %{tmp_left}, i1 %{tmp_right}\n").as_str());
+                        ty = "i1".to_string();
+                    }else if op == "&"{
+                        self.output.push_str(format!("\t%{tmp_res} = and i1 %{tmp_left},i1 %{tmp_right}\n").as_str());
+                        ty = "i1".to_string();
+                    }else if op == "^"{
+                        self.output.push_str(format!("\t%{tmp_res} = xor i1 %{tmp_left},i1 %{tmp_right}\n").as_str());
+                        ty = "i1".to_string();
+                    }else if op == "!"{
+                        self.output.push_str(format!("\t%{tmp_res} = xor i1 %{tmp_left}, true\n").as_str());
                         ty = "i1".to_string();
                     }else{
 
@@ -437,14 +450,14 @@ impl Codegen {
             let v = self.generate_code_expression(ast);
             let t = tylist.get(i).unwrap();
 
-            if tylist[i] != "i8*"{
+            // if tylist[i] != "i8*"{
                 let ptmp = self.tmp;
                 self.tmp += 1;
                 self.output.push_str(&format!("\t%{ptmp} = load {t} , {t}* {v}\n"));
                 values.push(format!("%{ptmp}"));
-            } else{
-                values.push(format!("{v}"));
-            }      
+            // } else{
+            //     values.push(format!("{v}"));
+            // }      
         }
 
         if ret_type == "void".to_string(){
